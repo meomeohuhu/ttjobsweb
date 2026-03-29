@@ -29,6 +29,9 @@ public class UserController {
     public String adminTest() {
         return "Admin access OK";
     }
-    
 
+    @GetMapping("/api/user/info")
+    public String userInfo() {
+        return "User Info OK";
+    }
 }
