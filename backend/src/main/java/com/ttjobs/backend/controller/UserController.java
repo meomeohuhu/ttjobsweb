@@ -9,6 +9,9 @@ import com.ttjobs.backend.service.UserService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import com.ttjobs.backend.entity.User;
+import com.ttjobs.backend.service.UserService;
+
 
 @RestController
 @RequestMapping("/api/users")
@@ -29,6 +32,7 @@ public class UserController {
     public String adminTest() {
         return "Admin access OK";
     }
+
 
     @GetMapping("/api/user/info")
     public String userInfo() {
