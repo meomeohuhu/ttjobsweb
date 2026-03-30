@@ -39,12 +39,22 @@ public class JwtFilter extends OncePerRequestFilter {
 
         try {
             String email = jwtService.extractEmail(token);
+<<<<<<< HEAD
             UsernamePasswordAuthentication Token auth =new UsernamePasswordAuthenticationToken(
                 email,
                 null,
                 Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"))
             )
 
+=======
+            UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                email,
+                null,
+                Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"))
+            );
+
+            SecurityContextHolder.getContext().setAuthentication(auth);
+>>>>>>> b4878935db9414e0c24d4d74e95f030f7ad59ad0
             // debug
             System.out.println("JWT valid for: " + email);
 

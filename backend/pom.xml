@@ -64,6 +64,10 @@
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+<<<<<<< HEAD
+=======
+
+>>>>>>> b4878935db9414e0c24d4d74e95f030f7ad59ad0
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security</artifactId>
@@ -89,6 +93,10 @@
     <scope>runtime</scope>
 </dependency>		
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> b4878935db9414e0c24d4d74e95f030f7ad59ad0
 	</dependencies>
 	<build>
 		<plugins>
