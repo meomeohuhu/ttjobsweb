@@ -19,10 +19,15 @@ public class UserService {
     private UserRepository userRepository;
 
     public User register(User user) {
-        BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
-        return userRepository.save(user);
+    if (userRepository.findByEmail(user.getEmail()).isPresent()) {
+        throw new RuntimeException("Email already exists");
     }
+
+    BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    user.setPassword(passwordEncoder.encode(user.getPassword()));
+
+    return userRepository.save(user);
+}
 
     public String login(String email, String password) {
         User user = userRepository.findByEmail(email)
