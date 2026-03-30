@@ -64,7 +64,7 @@
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
-<<<<<<< HEAD
+
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security</artifactId>
@@ -90,14 +90,7 @@
     <scope>runtime</scope>
 </dependency>		
 
-=======
 
-		<dependency>
-			<groupId>org.postgresql</groupId>
-			<artifactId>postgresql</artifactId>
-		</dependency>
-
->>>>>>> f43db024027cc48109eb85f3d54b21584fef54c4
 	</dependencies>
 	<build>
 		<plugins>
