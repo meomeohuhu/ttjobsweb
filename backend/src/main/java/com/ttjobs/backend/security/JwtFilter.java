@@ -44,6 +44,7 @@ public class JwtFilter extends OncePerRequestFilter {
                 null,
                 Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"))
             );
+
             SecurityContextHolder.getContext().setAuthentication(auth);
             // debug
             System.out.println("JWT valid for: " + email);
