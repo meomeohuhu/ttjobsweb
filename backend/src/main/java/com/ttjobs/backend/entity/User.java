@@ -1,8 +1,13 @@
 package com.ttjobs.backend.entity;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -18,10 +23,30 @@ public class User {
     private Long id;
 
     private String name;
-    @Column(unique = true)
+    // Unique and non-nullable email 
+    @Column(unique = true,nullable = false)
     private String email;
+    @Column(nullable = false)   
     private String password;
-    private String role;
+    public enum Role {
+    CANDIDATE,
+    EMPLOYER,
+    ADMIN
+}
+    private String phone;
+    private String address;
+    @ManyToMany
+    @JoinTable(
+        name="user_skills",
+        joinColumns =@JoinColumn(name="user_id"),
+        inverseJoinColumns = @JoinColumn(name="skill_id")
+    )
+    private List<Skill> skills;
+    private Integer experienceYears;
+    private String cvUrl;
+    private String avatarUrl;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
     
 
 }

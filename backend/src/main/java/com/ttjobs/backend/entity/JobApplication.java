@@ -20,11 +20,18 @@ public class JobApplication {
     private Long id;
 
     private LocalDateTime applicationDate;
-    private String status; // PENDING, ACCEPTED, REJECTED
+    private String status;
+    private enum Status{
+        pending,
+        accepted,
+        rejected
+    } // PENDING, ACCEPTED, REJECTED
 
     @ManyToOne
     @JoinColumn(name = "user_id")
     private User user;
+
+    
 
     @ManyToOne
     @JoinColumn(name = "job_id")
