@@ -6,13 +6,15 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import java.util.Collections;
+
 import java.io.IOException;
+import java.util.Collections;
+import java.util.Locale;
 
 @Component
 public class JwtFilter extends OncePerRequestFilter {
@@ -28,27 +30,32 @@ public class JwtFilter extends OncePerRequestFilter {
 
         String authHeader = request.getHeader("Authorization");
 
-        // 🔥 Nếu không có token → bỏ qua
+        // No bearer token: continue without authentication.
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        // lấy token
+        // Extract token from header.
         String token = authHeader.substring(7);
 
         try {
             String email = jwtService.extractEmail(token);
+            String role = jwtService.extractRole(token);
+
+            if (role == null || role.isBlank()) {
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                return;
+            }
+
+            String authority = "ROLE_" + role.toUpperCase(Locale.ROOT);
             UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                 email,
                 null,
-                Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"))
+                Collections.singletonList(new SimpleGrantedAuthority(authority))
             );
 
             SecurityContextHolder.getContext().setAuthentication(auth);
-            // debug
-            System.out.println("JWT valid for: " + email);
-
         } catch (Exception e) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             return;

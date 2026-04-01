@@ -1,40 +1,19 @@
 package com.ttjobs.backend.controller;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
-
-import com.ttjobs.backend.dto.LoginRequest;
-import com.ttjobs.backend.entity.User;
-import com.ttjobs.backend.service.UserService;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-
-import com.ttjobs.backend.entity.User;
-import com.ttjobs.backend.service.UserService;
-
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/users")
+@RequestMapping("/api")
 public class UserController {
 
-    @Autowired
-    private UserService userService;
-
-    @PostMapping("/register")
-    public User register(@RequestBody User user){
-        return userService.register(user);
-    }
-    @PostMapping("/login")
-    public String login(@RequestBody LoginRequest request){
-        return userService.login(request.getEmail(), request.getPassword());
-    }
-    @GetMapping("/api/admin/test")
+    @GetMapping("/admin/test")
     public String adminTest() {
         return "Admin access OK";
     }
 
-
-    @GetMapping("/api/user/info")
+    @GetMapping("/users/info")
     public String userInfo() {
         return "User Info OK";
     }

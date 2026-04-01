@@ -6,6 +6,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.ttjobs.backend.dto.RegisterRequest;
 import com.ttjobs.backend.entity.User;
 import com.ttjobs.backend.repository.UserRepository;
 
@@ -18,16 +19,23 @@ public class UserService {
     @Autowired
     private UserRepository userRepository;
 
-    public User register(User user) {
-    if (userRepository.findByEmail(user.getEmail()).isPresent()) {
-        throw new RuntimeException("Email already exists");
+    public User register(RegisterRequest request) {
+        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+            throw new RuntimeException("Email already exists");
+        }
+
+        User user = new User();
+        user.setName(request.getName());
+        user.setEmail(request.getEmail());
+
+        BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+
+        // Default role for new accounts if not provided.
+        user.setRole(User.Role.CANDIDATE);
+
+        return userRepository.save(user);
     }
-
-    BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-    user.setPassword(passwordEncoder.encode(user.getPassword()));
-
-    return userRepository.save(user);
-}
 
     public String login(String email, String password) {
         User user = userRepository.findByEmail(email)
@@ -35,10 +43,10 @@ public class UserService {
 
         BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
-        if (!encoder.matches(password, user.getPassword())) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
+        if (!encoder.matches(password, user.getPasswordHash())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
         }
 
-        return jwtService.generateToken(user.getEmail());
+        return jwtService.generateToken(user.getEmail(), user.getRole().name());
     }
 }
