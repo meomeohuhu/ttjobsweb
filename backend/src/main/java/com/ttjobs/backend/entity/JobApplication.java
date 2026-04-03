@@ -7,6 +7,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import lombok.Data;
 import java.time.LocalDateTime;
 
@@ -21,11 +23,7 @@ public class JobApplication {
 
     private LocalDateTime applicationDate;
     private String status;
-    private enum Status{
-        pending,
-        accepted,
-        rejected
-    } // PENDING, ACCEPTED, REJECTED
+    private LocalDateTime updatedAt;
 
     @ManyToOne
     @JoinColumn(name = "user_id")
@@ -36,4 +34,18 @@ public class JobApplication {
     @ManyToOne
     @JoinColumn(name = "job_id")
     private Job job;
+
+    @PrePersist
+    public void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        if (applicationDate == null) {
+            applicationDate = now;
+        }
+        updatedAt = now;
+    }
+
+    @PreUpdate
+    public void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 }

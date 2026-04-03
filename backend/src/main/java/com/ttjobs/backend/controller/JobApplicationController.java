@@ -1,14 +1,18 @@
 package com.ttjobs.backend.controller;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
-import com.ttjobs.backend.entity.JobApplication;
 import com.ttjobs.backend.dto.JobApplicationDTO;
 import com.ttjobs.backend.service.JobApplicationService;
+import org.springframework.validation.annotation.Validated;
+
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/applications")
+@Validated
 public class JobApplicationController {
 
     @Autowired
@@ -29,16 +33,27 @@ public class JobApplicationController {
         return jobApplicationService.getApplicationsByJobId(jobId);
     }
 
+    @GetMapping("/recruiter/my-jobs")
+    public List<JobApplicationDTO> getApplicationsForMyJobs() {
+        return jobApplicationService.getApplicationsForMyJobs();
+    }
+
     @PostMapping("/apply")
-    public JobApplication applyForJob(@RequestParam Long userId, @RequestParam Long jobId) {
+    public JobApplicationDTO applyForJob(@RequestParam @NotNull Long userId, @RequestParam @NotNull Long jobId) {
         return jobApplicationService.applyForJob(userId, jobId);
     }
 
     @PutMapping("/{applicationId}/status")
-    public JobApplication updateApplicationStatus(@PathVariable Long applicationId, @RequestParam String status) {
+    public JobApplicationDTO updateApplicationStatus(@PathVariable Long applicationId, @RequestParam @NotBlank String status) {
         return jobApplicationService.updateApplicationStatus(applicationId, status);
     }
 
+    @PutMapping("/{applicationId}/withdraw")
+    public JobApplicationDTO withdrawApplication(@PathVariable Long applicationId) {
+        return jobApplicationService.withdrawApplication(applicationId);
+    }
+
+    // Keep old DELETE endpoint contract, but service performs candidate withdraw.
     @DeleteMapping("/{applicationId}")
     public void deleteApplication(@PathVariable Long applicationId) {
         jobApplicationService.deleteApplication(applicationId);

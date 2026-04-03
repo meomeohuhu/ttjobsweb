@@ -12,6 +12,8 @@ import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -30,17 +32,18 @@ public class Job {
     private String description;
     private String location;
     private BigDecimal salary;
+    private BigDecimal salaryMin;
+    private BigDecimal salaryMax;
+    @Column(nullable = false)
+    private String currency;
     private String jobType;
-    private enum JobType {
-        FULL_TIME,
-        PART_TIME,
-        CONTRACT,
-        INTERN,
-        REMOTE
-    }
     private String experienceLevel; // ENTRY, MID, SENIOR, etc.
+    @Column(nullable = false)
+    private String status;
     private LocalDateTime postedDate;
     private LocalDateTime applicationDeadline;
+    private LocalDateTime updatedAt;
+    private LocalDateTime deletedAt;
 
     @ManyToOne
     @JoinColumn(name = "company_id")
@@ -55,4 +58,18 @@ public class Job {
         inverseJoinColumns = @JoinColumn(name="skill_id")
     )
     private List<Skill> skills;
+
+    @PrePersist
+    public void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        if (postedDate == null) {
+            postedDate = now;
+        }
+        updatedAt = now;
+    }
+
+    @PreUpdate
+    public void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 }

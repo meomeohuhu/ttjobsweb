@@ -28,7 +28,7 @@ public class User {
     // Unique and non-nullable email 
     @Column(unique = true,nullable = false)
     private String email;
-    @Column(name = "password", nullable = false)
+    @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
     public enum Role {

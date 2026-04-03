@@ -11,8 +11,12 @@ public class JobDTO {
     private String description;
     private String location;
     private BigDecimal salary;
+    private BigDecimal salaryMin;
+    private BigDecimal salaryMax;
+    private String currency;
     private String jobType;
     private String experienceLevel;
+    private String status;
     private LocalDateTime postedDate;
     private LocalDateTime applicationDeadline;
     private Long companyId;
