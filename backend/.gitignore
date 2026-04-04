@@ -31,3 +31,10 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Secrets ###
+.env
+.env.*
+src/main/resources/application-secret.properties
+src/main/resources/cloudinary.properties
+src/main/resources/*secret*.properties
