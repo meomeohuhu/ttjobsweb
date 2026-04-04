@@ -13,6 +13,7 @@ tags:
   - name: Companies
   - name: Jobs
   - name: Applications
+  - name: Saved Jobs
   - name: Notifications
 paths:
   /api/auth/register:
@@ -70,6 +71,185 @@ paths:
           description: Unauthorized
         "403":
           description: Forbidden
+  /api/users/me:
+    get:
+      tags: [Users]
+      summary: Get current user's profile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileDTO'
+    put:
+      tags: [Users]
+      summary: Update current user's profile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMyProfileRequest'
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileDTO'
+        "400":
+          description: Validation error
+  /api/users/me/cv:
+    get:
+      tags: [Users]
+      summary: Get current user's CV info
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current CV info
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserCvDTO'
+    post:
+      tags: [Users]
+      summary: Upload current user's CV (PDF/DOC/DOCX)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: CV uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserCvDTO'
+        "400":
+          description: Invalid file
+        "503":
+          description: Cloudinary not configured
+    put:
+      tags: [Users]
+      summary: Replace current user's CV
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: CV replaced
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserCvDTO'
+    delete:
+      tags: [Users]
+      summary: Delete current user's CV
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: CV deleted
+        "404":
+          description: CV not found
+  /api/users/me/avatar:
+    get:
+      tags: [Users]
+      summary: Get current user's avatar info
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current avatar info
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAvatarDTO'
+    post:
+      tags: [Users]
+      summary: Upload current user's avatar (JPG/PNG/WEBP)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Avatar uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAvatarDTO'
+        "400":
+          description: Invalid file
+        "503":
+          description: Cloudinary not configured
+    put:
+      tags: [Users]
+      summary: Replace current user's avatar
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Avatar replaced
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAvatarDTO'
+    delete:
+      tags: [Users]
+      summary: Delete current user's avatar
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Avatar deleted
+        "404":
+          description: Avatar not found
   /api/admin/test:
     get:
       tags: [Users]
@@ -673,6 +853,64 @@ paths:
       responses:
         "200":
           description: Withdraw success
+  /api/saved-jobs:
+    get:
+      tags: [Saved Jobs]
+      summary: Get my saved jobs (Candidate)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Saved jobs list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SavedJobDTO'
+        "403":
+          description: Forbidden
+  /api/saved-jobs/{jobId}:
+    post:
+      tags: [Saved Jobs]
+      summary: Save a job (Candidate)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: jobId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Saved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedJobDTO'
+        "404":
+          description: Job not found
+        "409":
+          description: Job already saved
+    delete:
+      tags: [Saved Jobs]
+      summary: Remove saved job (Candidate)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: jobId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Removed successfully
+        "404":
+          description: Saved job not found
   /api/notifications:
     get:
       tags: [Notifications]
@@ -807,6 +1045,70 @@ components:
         updatedAt:
           type: string
           format: date-time
+    UserCvDTO:
+      type: object
+      properties:
+        userId:
+          type: integer
+          format: int64
+        cvUrl:
+          type: string
+    UserProfileDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [CANDIDATE, RECRUITER, ADMIN]
+        phone:
+          type: string
+        address:
+          type: string
+        experienceYears:
+          type: integer
+        cvUrl:
+          type: string
+        avatarUrl:
+          type: string
+        skills:
+          type: array
+          items:
+            type: string
+    UpdateMyProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 120
+        phone:
+          type: string
+          maxLength: 30
+        address:
+          type: string
+          maxLength: 255
+        experienceYears:
+          type: integer
+          minimum: 0
+        skills:
+          type: array
+          items:
+            type: string
+            maxLength: 64
+    UserAvatarDTO:
+      type: object
+      properties:
+        userId:
+          type: integer
+          format: int64
+        avatarUrl:
+          type: string
     CompanyDTO:
       type: object
       properties:
@@ -973,6 +1275,29 @@ components:
           type: string
         companyName:
           type: string
+    SavedJobDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        userId:
+          type: integer
+          format: int64
+        jobId:
+          type: integer
+          format: int64
+        jobTitle:
+          type: string
+        companyName:
+          type: string
+        jobLocation:
+          type: string
+        jobStatus:
+          type: string
+        savedAt:
+          type: string
+          format: date-time
     NotificationDTO:
       type: object
       properties:

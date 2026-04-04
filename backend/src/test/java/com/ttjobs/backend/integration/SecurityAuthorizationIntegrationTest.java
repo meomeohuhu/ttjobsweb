@@ -75,8 +75,32 @@ class SecurityAuthorizationIntegrationTest {
     }
 
     @Test
+    void usersMe_shouldReturnUnauthorized_whenMissingToken() throws Exception {
+        mockMvc.perform(get("/api/users/me"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void usersMeCv_shouldReturnUnauthorized_whenMissingToken() throws Exception {
+        mockMvc.perform(get("/api/users/me/cv"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void usersMeAvatar_shouldReturnUnauthorized_whenMissingToken() throws Exception {
+        mockMvc.perform(get("/api/users/me/avatar"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void notifications_shouldReturnUnauthorized_whenMissingToken() throws Exception {
         mockMvc.perform(get("/api/notifications"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void savedJobs_shouldReturnUnauthorized_whenMissingToken() throws Exception {
+        mockMvc.perform(get("/api/saved-jobs"))
                 .andExpect(status().isUnauthorized());
     }
 

@@ -32,8 +32,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 // Any authenticated user can access user profile routes.
                 .requestMatchers("/api/users/**").authenticated()
-                // Company, jobs and applications are protected APIs.
-                .requestMatchers("/api/companies/**", "/api/jobs/**", "/api/applications/**", "/api/notifications/**").authenticated()
+                // Company, jobs, applications, saved jobs and notifications are protected APIs.
+                .requestMatchers("/api/companies/**", "/api/jobs/**", "/api/applications/**", "/api/saved-jobs/**", "/api/notifications/**").authenticated()
                 // Keep other routes open for now (you can tighten this later).
                 .anyRequest().permitAll()
             )
