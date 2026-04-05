@@ -28,12 +28,14 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // Public endpoints: registration and login.
                 .requestMatchers("/api/auth/**").permitAll()
+                // Swagger UI and static OpenAPI spec.
+                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/openapi.yaml", "/actuator/health").permitAll()
                 // Only users with ROLE_ADMIN can access admin routes.
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 // Any authenticated user can access user profile routes.
                 .requestMatchers("/api/users/**").authenticated()
                 // Company, jobs, applications, saved jobs and notifications are protected APIs.
-                .requestMatchers("/api/companies/**", "/api/jobs/**", "/api/applications/**", "/api/saved-jobs/**", "/api/notifications/**").authenticated()
+                .requestMatchers("/api/companies/**", "/api/jobs/**", "/api/applications/**", "/api/saved-jobs/**", "/api/notifications/**", "/api/conversations/**").authenticated()
                 // Keep other routes open for now (you can tighten this later).
                 .anyRequest().permitAll()
             )

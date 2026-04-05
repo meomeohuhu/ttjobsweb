@@ -15,6 +15,7 @@ tags:
   - name: Applications
   - name: Saved Jobs
   - name: Notifications
+  - name: Chat
 paths:
   /api/auth/register:
     post:
@@ -627,6 +628,10 @@ paths:
         - bearerAuth: []
       parameters:
         - in: query
+          name: keyword
+          schema:
+            type: string
+        - in: query
           name: title
           schema:
             type: string
@@ -638,6 +643,16 @@ paths:
           name: companyName
           schema:
             type: string
+        - in: query
+          name: salaryMin
+          schema:
+            type: number
+            format: double
+        - in: query
+          name: salaryMax
+          schema:
+            type: number
+            format: double
         - in: query
           name: jobType
           schema:
@@ -651,6 +666,13 @@ paths:
           schema:
             type: string
             example: open
+        - in: query
+          name: skills
+          description: Repeated query params, e.g. skills=Java&skills=Spring
+          schema:
+            type: array
+            items:
+              type: string
         - in: query
           name: page
           schema:
@@ -853,6 +875,28 @@ paths:
       responses:
         "200":
           description: Withdraw success
+  /api/applications/{applicationId}/timeline:
+    get:
+      tags: [Applications]
+      summary: Get application status timeline (owner candidate/Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: applicationId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Timeline list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ApplicationTimelineDTO'
   /api/saved-jobs:
     get:
       tags: [Saved Jobs]
@@ -909,6 +953,33 @@ paths:
       responses:
         "200":
           description: Removed successfully
+        "404":
+          description: Saved job not found
+    put:
+      tags: [Saved Jobs]
+      summary: Update saved job note/tag (Candidate)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: jobId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSavedJobRequest'
+      responses:
+        "200":
+          description: Saved job updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedJobDTO'
         "404":
           description: Saved job not found
   /api/notifications:
@@ -984,6 +1055,130 @@ paths:
       responses:
         "200":
           description: All notifications marked as read
+  /api/notifications/preferences:
+    get:
+      tags: [Notifications]
+      summary: Get notification preferences
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Notification preferences
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPreferenceDTO'
+    put:
+      tags: [Notifications]
+      summary: Update notification preferences
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationPreferenceRequest'
+      responses:
+        "200":
+          description: Preferences updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPreferenceDTO'
+  /api/conversations:
+    post:
+      tags: [Chat]
+      summary: Create a conversation
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateConversationRequest'
+      responses:
+        "200":
+          description: Conversation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationDTO'
+    get:
+      tags: [Chat]
+      summary: Get my conversations
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Conversation list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConversationDTO'
+  /api/conversations/{conversationId}/messages:
+    post:
+      tags: [Chat]
+      summary: Send a message
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: conversationId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendMessageRequest'
+      responses:
+        "200":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageDTO'
+    get:
+      tags: [Chat]
+      summary: Get messages in a conversation
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: conversationId
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - in: query
+          name: size
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Message list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MessageDTO'
 
 components:
   securitySchemes:
@@ -1298,6 +1493,17 @@ components:
         savedAt:
           type: string
           format: date-time
+        note:
+          type: string
+        tag:
+          type: string
+    UpdateSavedJobRequest:
+      type: object
+      properties:
+        note:
+          type: string
+        tag:
+          type: string
     NotificationDTO:
       type: object
       properties:
@@ -1315,3 +1521,77 @@ components:
         createdAt:
           type: string
           format: date-time
+    NotificationPreferenceDTO:
+      type: object
+      properties:
+        inAppEnabled:
+          type: boolean
+        emailEnabled:
+          type: boolean
+    NotificationPreferenceRequest:
+      type: object
+      properties:
+        inAppEnabled:
+          type: boolean
+        emailEnabled:
+          type: boolean
+    ApplicationTimelineDTO:
+      type: object
+      properties:
+        fromStatus:
+          type: string
+        toStatus:
+          type: string
+        changedAt:
+          type: string
+          format: date-time
+    ConversationDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        memberIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+    CreateConversationRequest:
+      type: object
+      required: [memberIds]
+      properties:
+        memberIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+    MessageDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        conversationId:
+          type: integer
+          format: int64
+        senderId:
+          type: integer
+          format: int64
+        content:
+          type: string
+        type:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    SendMessageRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+        type:
+          type: string

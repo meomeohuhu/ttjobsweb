@@ -14,4 +14,6 @@ public class SavedJobDTO {
     private String jobLocation;
     private String jobStatus;
     private LocalDateTime savedAt;
+    private String note;
+    private String tag;
 }

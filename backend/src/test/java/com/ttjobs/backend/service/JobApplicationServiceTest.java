@@ -5,6 +5,7 @@ import com.ttjobs.backend.entity.Company;
 import com.ttjobs.backend.entity.Job;
 import com.ttjobs.backend.entity.JobApplication;
 import com.ttjobs.backend.entity.User;
+import com.ttjobs.backend.entity.JobApplicationStatusAudit;
 import com.ttjobs.backend.repository.JobApplicationRepository;
 import com.ttjobs.backend.repository.JobApplicationStatusAuditRepository;
 import com.ttjobs.backend.repository.JobRepository;
@@ -45,6 +46,8 @@ class JobApplicationServiceTest {
     private JobApplicationStatusAuditRepository statusAuditRepository;
     @Mock
     private NotificationService notificationService;
+    @Mock
+    private EmailService emailService;
 
     @InjectMocks
     private JobApplicationService jobApplicationService;
@@ -77,6 +80,38 @@ class JobApplicationServiceTest {
                 () -> jobApplicationService.applyForJob(1L, 10L));
 
         assertEquals(400, ex.getStatusCode().value());
+    }
+
+    @Test
+    void applyForJob_shouldSendEmail_whenSuccess() {
+        User currentUser = user(1L, User.Role.CANDIDATE);
+        User recruiter = user(2L, User.Role.RECRUITER);
+        Company company = new Company();
+        company.setCreatedBy(recruiter);
+
+        Job job = new Job();
+        job.setId(10L);
+        job.setTitle("Java Dev");
+        job.setStatus("open");
+        job.setCompany(company);
+
+        JobApplication application = new JobApplication();
+        application.setId(77L);
+        application.setUser(currentUser);
+        application.setJob(job);
+        application.setStatus("submitted");
+        application.setApplicationDate(LocalDateTime.now());
+
+        when(authContextService.requireCurrentUser()).thenReturn(currentUser);
+        when(jobApplicationRepository.findByUserIdAndJobId(1L, 10L)).thenReturn(Optional.empty());
+        when(userRepository.findById(1L)).thenReturn(Optional.of(currentUser));
+        when(jobRepository.findByIdAndDeletedAtIsNull(10L)).thenReturn(Optional.of(job));
+        when(jobApplicationRepository.save(org.mockito.ArgumentMatchers.any(JobApplication.class))).thenReturn(application);
+
+        JobApplicationDTO result = jobApplicationService.applyForJob(1L, 10L);
+        assertEquals(77L, result.getId());
+        verify(emailService).sendApplicationSubmitted(currentUser, job);
+        verify(emailService).sendNewApplication(recruiter, currentUser, job);
     }
 
     @Test
@@ -255,6 +290,26 @@ class JobApplicationServiceTest {
 
         JobApplicationDTO result = jobApplicationService.withdrawApplication(88L);
         assertEquals("withdrawn", result.getStatus());
+    }
+
+    @Test
+    void getApplicationTimeline_shouldReturnAudits() {
+        User currentUser = user(1L, User.Role.CANDIDATE);
+
+        JobApplication app = new JobApplication();
+        app.setId(5L);
+        app.setUser(currentUser);
+
+        JobApplicationStatusAudit audit = new JobApplicationStatusAudit();
+        audit.setFromStatus("submitted");
+        audit.setToStatus("reviewing");
+
+        when(authContextService.requireCurrentUser()).thenReturn(currentUser);
+        when(authContextService.isAdmin(currentUser)).thenReturn(false);
+        when(jobApplicationRepository.findById(5L)).thenReturn(Optional.of(app));
+        when(statusAuditRepository.findByApplicationIdOrderByChangedAtAsc(5L)).thenReturn(List.of(audit));
+
+        assertEquals(1, jobApplicationService.getApplicationTimeline(5L).size());
     }
 
     private User user(Long id, User.Role role) {

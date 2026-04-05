@@ -114,6 +114,23 @@ class SavedJobServiceTest {
         assertEquals(403, ex.getStatusCode().value());
     }
 
+    @Test
+    void updateSavedJob_shouldUpdateNoteAndTag() {
+        User candidate = user(1L, User.Role.CANDIDATE);
+        SavedJob savedJob = new SavedJob();
+        savedJob.setId(40L);
+        savedJob.setUser(candidate);
+        savedJob.setJob(job(10L, "Backend", "open"));
+
+        when(authContextService.requireCurrentUser()).thenReturn(candidate);
+        when(savedJobRepository.findByUserIdAndJobId(1L, 10L)).thenReturn(Optional.of(savedJob));
+        when(savedJobRepository.save(savedJob)).thenReturn(savedJob);
+
+        SavedJobDTO result = savedJobService.updateSavedJob(10L, "note", "tag");
+        assertEquals("note", result.getNote());
+        assertEquals("tag", result.getTag());
+    }
+
     private User user(Long id, User.Role role) {
         User user = new User();
         user.setId(id);

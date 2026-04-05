@@ -33,6 +33,9 @@ public class SavedJob {
     @Column(nullable = false)
     private LocalDateTime savedAt;
 
+    private String note;
+    private String tag;
+
     @PrePersist
     public void onCreate() {
         if (savedAt == null) {

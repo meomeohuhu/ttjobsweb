@@ -70,10 +70,27 @@ public class SavedJobService {
                 .collect(Collectors.toList());
     }
 
+    public SavedJobDTO updateSavedJob(Long jobId, String note, String tag) {
+        User currentUser = authContextService.requireCurrentUser();
+        if (currentUser.getRole() != User.Role.CANDIDATE) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only candidate can update saved jobs");
+        }
+
+        SavedJob savedJob = savedJobRepository.findByUserIdAndJobId(currentUser.getId(), jobId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Saved job not found"));
+
+        // Update note/tag for saved job.
+        savedJob.setNote(note);
+        savedJob.setTag(tag);
+        return toDto(savedJobRepository.save(savedJob));
+    }
+
     private SavedJobDTO toDto(SavedJob savedJob) {
         SavedJobDTO dto = new SavedJobDTO();
         dto.setId(savedJob.getId());
         dto.setSavedAt(savedJob.getSavedAt());
+        dto.setNote(savedJob.getNote());
+        dto.setTag(savedJob.getTag());
         if (savedJob.getUser() != null) {
             dto.setUserId(savedJob.getUser().getId());
         }

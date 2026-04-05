@@ -8,8 +8,10 @@ import org.springframework.web.bind.annotation.*;
 import com.ttjobs.backend.entity.Job;
 import com.ttjobs.backend.dto.JobDTO;
 import com.ttjobs.backend.service.JobService;
+import com.ttjobs.backend.exception.ResourceNotFoundException;
 import org.springframework.validation.annotation.Validated;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @RestController
@@ -28,7 +30,7 @@ public class JobController {
     @GetMapping("/{id}")
     public JobDTO getJobById(@PathVariable Long id) {
         return jobService.getJobById(id)
-                .orElseThrow(() -> new RuntimeException("Job not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Job not found"));
     }
 
     @GetMapping("/company/{companyId}")
@@ -60,14 +62,20 @@ public class JobController {
     }
 
     @GetMapping("/search")
-    public List<JobDTO> searchJobs(@RequestParam(required = false) String title,
+    public List<JobDTO> searchJobs(@RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String title,
             @RequestParam(required = false) String location,
             @RequestParam(required = false) String companyName,
             @RequestParam(required = false) String jobType,
             @RequestParam(required = false) String experienceLevel,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) BigDecimal salaryMin,
+            @RequestParam(required = false) BigDecimal salaryMax,
+            @RequestParam(required = false) List<String> skills,
             @RequestParam(required = false, defaultValue = "0") @Min(0) Integer page,
             @RequestParam(required = false, defaultValue = "20") @Min(1) @Max(100) Integer size) {
-        return jobService.searchJobs(title, location, companyName, jobType, experienceLevel, status, page, size);
+        String effectiveKeyword = (keyword != null && !keyword.isBlank()) ? keyword : title;
+        return jobService.searchJobs(effectiveKeyword, location, companyName, jobType, experienceLevel,
+                status, salaryMin, salaryMax, skills, page, size);
     }
 }

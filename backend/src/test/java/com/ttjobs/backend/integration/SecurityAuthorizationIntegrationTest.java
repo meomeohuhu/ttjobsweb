@@ -93,6 +93,12 @@ class SecurityAuthorizationIntegrationTest {
     }
 
     @Test
+    void swaggerUi_shouldBePublic() throws Exception {
+        mockMvc.perform(get("/swagger-ui/index.html"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void notifications_shouldReturnUnauthorized_whenMissingToken() throws Exception {
         mockMvc.perform(get("/api/notifications"))
                 .andExpect(status().isUnauthorized());
