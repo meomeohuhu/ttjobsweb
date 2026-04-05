@@ -35,7 +35,7 @@ public class SecurityConfig {
                 // Any authenticated user can access user profile routes.
                 .requestMatchers("/api/users/**").authenticated()
                 // Company, jobs, applications, saved jobs and notifications are protected APIs.
-                .requestMatchers("/api/companies/**", "/api/jobs/**", "/api/applications/**", "/api/saved-jobs/**", "/api/notifications/**", "/api/conversations/**").authenticated()
+                .requestMatchers("/api/companies/**", "/api/jobs/**", "/api/applications/**", "/api/saved-jobs/**", "/api/notifications/**", "/api/conversations/**", "/api/recommendations/**").authenticated()
                 // Keep other routes open for now (you can tighten this later).
                 .anyRequest().permitAll()
             )

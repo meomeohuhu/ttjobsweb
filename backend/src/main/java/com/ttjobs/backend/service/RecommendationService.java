@@ -1,0 +1,136 @@
+package com.ttjobs.backend.service;
+
+import com.ttjobs.backend.dto.AiPredictionDTO;
+import com.ttjobs.backend.dto.AiPredictionRequest;
+import com.ttjobs.backend.dto.JobDTO;
+import com.ttjobs.backend.entity.Job;
+import com.ttjobs.backend.entity.User;
+import com.ttjobs.backend.repository.JobRepository;
+import com.ttjobs.backend.repository.JobSpecifications;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.RequestEntity;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.server.ResponseStatusException;
+
+@Service
+public class RecommendationService {
+
+    private static final int TOP_CATEGORIES = 3;
+    private static final int MAX_JOBS = 30;
+
+    @Autowired
+    private AuthContextService authContextService;
+    @Autowired
+    private JobRepository jobRepository;
+    @Autowired
+    private ObjectMapper objectMapper;
+    @Autowired
+    private RestTemplate restTemplate;
+
+    @Value("${ttjobs.ai.base-url}")
+    private String aiBaseUrl;
+
+    public List<JobDTO> recommendByCv() {
+        User currentUser = authContextService.requireCurrentUser();
+        if (currentUser.getRole() != User.Role.CANDIDATE) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only candidate can request recommendations");
+        }
+        if (currentUser.getCvText() == null || currentUser.getCvText().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CV text not found");
+        }
+
+        List<AiPredictionDTO> predictions = fetchPredictions(currentUser.getCvText());
+        List<String> categories = predictions.stream()
+                .map(AiPredictionDTO::getCategory)
+                .filter(c -> c != null && !c.isBlank())
+                .limit(TOP_CATEGORIES)
+                .toList();
+
+        if (categories.isEmpty()) {
+            return List.of();
+        }
+
+        Specification<Job> spec = Specification.where(JobSpecifications.activeJobs())
+                .and(JobSpecifications.statusEquals("open"))
+                .and(JobSpecifications.categoryIn(categories));
+
+        return jobRepository.findAll(spec, PageRequest.of(0, MAX_JOBS))
+                .stream()
+                .map(this::toDto)
+                .collect(Collectors.toList());
+    }
+
+    private List<AiPredictionDTO> fetchPredictions(String cvText) {
+        try {
+            AiPredictionRequest request = new AiPredictionRequest();
+            request.setCvText(cvText);
+
+            RequestEntity<AiPredictionRequest> entity = RequestEntity
+                    .post(aiBaseUrl + "/ai/predict")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(request);
+
+            String response = restTemplate.exchange(entity, String.class).getBody();
+            if (response == null || response.isBlank()) {
+                return List.of();
+            }
+
+            List<List<Object>> raw = objectMapper.readValue(response, new TypeReference<>() {});
+            List<AiPredictionDTO> predictions = new ArrayList<>();
+            for (List<Object> item : raw) {
+                if (item.size() < 2) {
+                    continue;
+                }
+                String category = item.get(0) == null ? null : item.get(0).toString();
+                Double score = null;
+                if (item.get(1) instanceof Number number) {
+                    score = number.doubleValue();
+                }
+                AiPredictionDTO dto = new AiPredictionDTO();
+                dto.setCategory(category);
+                dto.setScore(score);
+                predictions.add(dto);
+            }
+            return predictions;
+        } catch (Exception ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "AI service unavailable");
+        }
+    }
+
+    private JobDTO toDto(Job job) {
+        JobDTO dto = new JobDTO();
+        dto.setId(job.getId());
+        dto.setTitle(job.getTitle());
+        dto.setDescription(job.getDescription());
+        dto.setLocation(job.getLocation());
+        dto.setSalary(job.getSalary());
+        dto.setSalaryMin(job.getSalaryMin());
+        dto.setSalaryMax(job.getSalaryMax());
+        dto.setCurrency(job.getCurrency());
+        dto.setJobType(job.getJobType());
+        dto.setExperienceLevel(job.getExperienceLevel());
+        dto.setCategory(job.getCategory());
+        dto.setStatus(job.getStatus());
+        dto.setPostedDate(job.getPostedDate());
+        dto.setApplicationDeadline(job.getApplicationDeadline());
+        if (job.getCompany() != null) {
+            dto.setCompanyId(job.getCompany().getId());
+            dto.setCompanyName(job.getCompany().getName());
+        }
+        return dto;
+    }
+}

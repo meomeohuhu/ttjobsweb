@@ -86,4 +86,20 @@ public final class JobSpecifications {
         };
     }
 
+    public static Specification<Job> categoryIn(List<String> categories) {
+        return (root, query, cb) -> {
+            if (categories == null || categories.isEmpty()) {
+                return cb.conjunction();
+            }
+            List<String> normalized = categories.stream()
+                    .filter(c -> c != null && !c.isBlank())
+                    .map(c -> c.trim().toLowerCase(Locale.ROOT))
+                    .toList();
+            if (normalized.isEmpty()) {
+                return cb.conjunction();
+            }
+            return cb.lower(root.get("category")).in(normalized);
+        };
+    }
+
 }

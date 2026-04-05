@@ -38,6 +38,7 @@ public class Job {
     private String currency;
     private String jobType;
     private String experienceLevel; // ENTRY, MID, SENIOR, etc.
+    private String category;
     @Column(nullable = false)
     private String status;
     private LocalDateTime postedDate;

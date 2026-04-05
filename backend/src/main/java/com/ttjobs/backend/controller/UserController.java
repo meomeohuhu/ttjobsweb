@@ -1,6 +1,7 @@
 package com.ttjobs.backend.controller;
 
 import com.ttjobs.backend.dto.UserCvDTO;
+import com.ttjobs.backend.dto.UserCvTextDTO;
 import com.ttjobs.backend.dto.UserAvatarDTO;
 import com.ttjobs.backend.dto.UserProfileDTO;
 import com.ttjobs.backend.dto.UpdateMyProfileRequest;
@@ -69,6 +70,16 @@ public class UserController {
     @DeleteMapping("/users/me/cv")
     public void deleteMyCv() {
         userCvService.deleteMyCv();
+    }
+
+    @GetMapping("/users/me/cv-text")
+    public UserCvTextDTO getMyCvText() {
+        return userCvService.getMyCvText();
+    }
+
+    @PostMapping("/users/me/cv-text")
+    public UserCvTextDTO extractMyCvText() {
+        return userCvService.extractMyCvText();
     }
 
     @GetMapping("/users/me/avatar")

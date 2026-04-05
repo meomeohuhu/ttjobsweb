@@ -16,6 +16,7 @@ public class JobDTO {
     private String currency;
     private String jobType;
     private String experienceLevel;
+    private String category;
     private String status;
     private LocalDateTime postedDate;
     private LocalDateTime applicationDeadline;
