@@ -178,6 +178,31 @@ paths:
           description: CV deleted
         "404":
           description: CV not found
+  /api/users/me/cv-text:
+    get:
+      tags: [Users]
+      summary: Get extracted CV text
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: CV text
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserCvTextDTO'
+    post:
+      tags: [Users]
+      summary: Extract CV text from uploaded CV
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: CV text extracted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserCvTextDTO'
   /api/users/me/avatar:
     get:
       tags: [Users]
@@ -1086,6 +1111,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NotificationPreferenceDTO'
+  /api/recommendations/cv:
+    post:
+      tags: [Jobs]
+      summary: Recommend jobs based on uploaded CV text (Candidate)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Recommended jobs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/JobDTO'
   /api/conversations:
     post:
       tags: [Chat]
@@ -1248,6 +1288,14 @@ components:
           format: int64
         cvUrl:
           type: string
+    UserCvTextDTO:
+      type: object
+      properties:
+        userId:
+          type: integer
+          format: int64
+        cvText:
+          type: string
     UserProfileDTO:
       type: object
       properties:
@@ -1395,6 +1443,8 @@ components:
           type: string
         experienceLevel:
           type: string
+        category:
+          type: string
         status:
           type: string
           enum: [draft, open, closed, archived]
@@ -1433,6 +1483,8 @@ components:
         jobType:
           type: string
         experienceLevel:
+          type: string
+        category:
           type: string
         status:
           type: string

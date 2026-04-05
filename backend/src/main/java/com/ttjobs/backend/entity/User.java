@@ -52,6 +52,7 @@ public class User {
     private List<Skill> skills;
     private Integer experienceYears;
     private String cvUrl;
+    private String cvText;
     private String avatarUrl;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

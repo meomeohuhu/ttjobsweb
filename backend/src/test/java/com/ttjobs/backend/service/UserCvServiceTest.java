@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -37,6 +38,8 @@ class UserCvServiceTest {
     private Cloudinary cloudinary;
     @Mock
     private Uploader uploader;
+    @Mock
+    private CvTextExtractionService cvTextExtractionService;
 
     @InjectMocks
     private UserCvService userCvService;
@@ -69,17 +72,21 @@ class UserCvServiceTest {
         when(cloudinary.uploader()).thenReturn(uploader);
         when(uploader.upload(any(byte[].class), any(Map.class)))
                 .thenReturn(Map.of("secure_url", "https://res.cloudinary.com/demo/raw/upload/v1/ttjobs/cv/file.pdf"));
+        when(cvTextExtractionService.extractText(any(byte[].class), any(String.class), any(String.class)))
+                .thenReturn("text");
         when(userRepository.save(user)).thenReturn(user);
 
         UserCvDTO result = userCvService.uploadMyCv(file);
         assertEquals(2L, result.getUserId());
         assertEquals("https://res.cloudinary.com/demo/raw/upload/v1/ttjobs/cv/file.pdf", result.getCvUrl());
+        assertNotNull(user.getCvText());
     }
 
     @Test
     void deleteMyCv_shouldClearCvUrl() {
         User user = user(3L);
         user.setCvUrl("https://res.cloudinary.com/demo/raw/upload/v1/ttjobs/cv/file.pdf");
+        user.setCvText("text");
 
         when(authContextService.requireCurrentUser()).thenReturn(user);
         when(cloudinaryProvider.getIfAvailable()).thenReturn(cloudinary);
@@ -88,7 +95,21 @@ class UserCvServiceTest {
         userCvService.deleteMyCv();
 
         assertNull(user.getCvUrl());
+        assertNull(user.getCvText());
         verify(userRepository).save(user);
+    }
+
+    @Test
+    void extractMyCvText_shouldReturnBadGateway_whenDownloadFails() {
+        User user = user(4L);
+        user.setCvUrl("http://invalid-host/cv.pdf");
+
+        when(authContextService.requireCurrentUser()).thenReturn(user);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> userCvService.extractMyCvText());
+
+        assertEquals(502, ex.getStatusCode().value());
     }
 
     private User user(Long id) {

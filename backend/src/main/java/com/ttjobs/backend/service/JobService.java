@@ -116,6 +116,10 @@ public class JobService {
         if (jobDetails.getExperienceLevel() != null) {
             job.setExperienceLevel(jobDetails.getExperienceLevel());
         }
+        // Update job category if provided.
+        if (jobDetails.getCategory() != null) {
+            job.setCategory(jobDetails.getCategory());
+        }
         if (jobDetails.getApplicationDeadline() != null) {
             job.setApplicationDeadline(jobDetails.getApplicationDeadline());
         }
@@ -300,6 +304,7 @@ public class JobService {
         dto.setCurrency(job.getCurrency());
         dto.setJobType(job.getJobType());
         dto.setExperienceLevel(job.getExperienceLevel());
+        dto.setCategory(job.getCategory());
         dto.setStatus(job.getStatus());
         dto.setPostedDate(job.getPostedDate());
         dto.setApplicationDeadline(job.getApplicationDeadline());
