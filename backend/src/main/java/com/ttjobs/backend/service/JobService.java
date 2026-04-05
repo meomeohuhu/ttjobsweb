@@ -6,13 +6,16 @@ import com.ttjobs.backend.entity.Job;
 import com.ttjobs.backend.entity.User;
 import com.ttjobs.backend.repository.CompanyRepository;
 import com.ttjobs.backend.repository.JobRepository;
+import com.ttjobs.backend.repository.JobSpecifications;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -149,13 +152,49 @@ public class JobService {
     public List<JobDTO> searchJobs(String title, String location, String companyName,
                                    String jobType, String experienceLevel, String status,
                                    Integer page, Integer size) {
+        return searchJobs(title, location, companyName, jobType, experienceLevel, status,
+                null, null, null, page, size);
+    }
+
+    public List<JobDTO> searchJobs(String keyword, String location, String companyName,
+                                   String jobType, String experienceLevel, String status,
+                                   BigDecimal salaryMin, BigDecimal salaryMax, List<String> skills,
+                                   Integer page, Integer size) {
         String normalizedStatus = normalizeJobStatus(status, OPEN);
         int safePage = page == null ? 0 : Math.max(page, 0);
         int safeSize = size == null ? 20 : Math.max(size, 1);
         Pageable pageable = PageRequest.of(safePage, safeSize);
 
-        return jobRepository.findJobsWithFilters(title, location, companyName, jobType, experienceLevel,
-                        normalizedStatus, pageable)
+        Specification<Job> spec = Specification.where(JobSpecifications.activeJobs());
+        if (keyword != null && !keyword.isBlank()) {
+            spec = spec.and(JobSpecifications.keywordLike(keyword));
+        }
+        if (location != null && !location.isBlank()) {
+            spec = spec.and(JobSpecifications.locationLike(location));
+        }
+        if (companyName != null && !companyName.isBlank()) {
+            spec = spec.and(JobSpecifications.companyNameLike(companyName));
+        }
+        if (jobType != null && !jobType.isBlank()) {
+            spec = spec.and(JobSpecifications.jobTypeEquals(jobType));
+        }
+        if (experienceLevel != null && !experienceLevel.isBlank()) {
+            spec = spec.and(JobSpecifications.experienceLevelEquals(experienceLevel));
+        }
+        if (normalizedStatus != null && !normalizedStatus.isBlank()) {
+            spec = spec.and(JobSpecifications.statusEquals(normalizedStatus));
+        }
+        if (salaryMin != null) {
+            spec = spec.and(JobSpecifications.salaryMinGte(salaryMin));
+        }
+        if (salaryMax != null) {
+            spec = spec.and(JobSpecifications.salaryMaxLte(salaryMax));
+        }
+        if (skills != null && !skills.isEmpty()) {
+            spec = spec.and(JobSpecifications.hasAnySkill(skills));
+        }
+
+        return jobRepository.findAll(spec, pageable)
                 .stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());

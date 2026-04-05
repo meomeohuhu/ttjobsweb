@@ -57,6 +57,8 @@ public class JobApplicationService {
 
     @Autowired
     private NotificationService notificationService;
+    @Autowired
+    private EmailService emailService;
 
     public List<JobApplicationDTO> getAllApplications() {
         User currentUser = authContextService.requireCurrentUser();
@@ -165,6 +167,8 @@ public class JobApplicationService {
                 "You have successfully applied to " + job.getTitle(),
                 "APPLICATION_SUBMITTED"
         );
+        // Send email to candidate after successful application.
+        emailService.sendApplicationSubmitted(user, job);
         if (job.getCompany() != null && job.getCompany().getCreatedBy() != null) {
             notificationService.createNotification(
                     job.getCompany().getCreatedBy(),
@@ -172,6 +176,8 @@ public class JobApplicationService {
                     user.getName() + " applied to " + job.getTitle(),
                     "NEW_APPLICATION"
             );
+            // Send email to company owner about the new application.
+            emailService.sendNewApplication(job.getCompany().getCreatedBy(), user, job);
         }
         return convertToDTO(saved);
     }
@@ -227,6 +233,29 @@ public class JobApplicationService {
         JobApplication saved = jobApplicationRepository.save(application);
         logStatusChange(saved, currentUser, currentStatus, WITHDRAWN);
         return convertToDTO(saved);
+    }
+
+    public List<com.ttjobs.backend.dto.ApplicationTimelineDTO> getApplicationTimeline(Long applicationId) {
+        User currentUser = authContextService.requireCurrentUser();
+        JobApplication application = jobApplicationRepository.findById(applicationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Application not found"));
+
+        if (!authContextService.isAdmin(currentUser)
+                && !currentUser.getId().equals(application.getUser().getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only view your own application timeline");
+        }
+
+        return statusAuditRepository.findByApplicationIdOrderByChangedAtAsc(applicationId)
+                .stream()
+                .map(audit -> {
+                    com.ttjobs.backend.dto.ApplicationTimelineDTO dto =
+                            new com.ttjobs.backend.dto.ApplicationTimelineDTO();
+                    dto.setFromStatus(audit.getFromStatus());
+                    dto.setToStatus(audit.getToStatus());
+                    dto.setChangedAt(audit.getChangedAt());
+                    return dto;
+                })
+                .collect(java.util.stream.Collectors.toList());
     }
 
     private String normalizeStatus(String status) {

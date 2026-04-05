@@ -58,4 +58,9 @@ public class JobApplicationController {
     public void deleteApplication(@PathVariable Long applicationId) {
         jobApplicationService.deleteApplication(applicationId);
     }
+
+    @GetMapping("/{applicationId}/timeline")
+    public List<com.ttjobs.backend.dto.ApplicationTimelineDTO> getTimeline(@PathVariable Long applicationId) {
+        return jobApplicationService.getApplicationTimeline(applicationId);
+    }
 }

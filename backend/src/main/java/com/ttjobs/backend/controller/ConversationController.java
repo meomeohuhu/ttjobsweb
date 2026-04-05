@@ -1,0 +1,53 @@
+package com.ttjobs.backend.controller;
+
+import com.ttjobs.backend.dto.ConversationDTO;
+import com.ttjobs.backend.dto.CreateConversationRequest;
+import com.ttjobs.backend.dto.MessageDTO;
+import com.ttjobs.backend.dto.SendMessageRequest;
+import com.ttjobs.backend.service.ConversationService;
+import com.ttjobs.backend.service.MessageService;
+import jakarta.validation.Valid;
+import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/conversations")
+public class ConversationController {
+
+    @Autowired
+    private ConversationService conversationService;
+    @Autowired
+    private MessageService messageService;
+
+    @PostMapping
+    public ConversationDTO createConversation(@Valid @RequestBody CreateConversationRequest request) {
+        return conversationService.createConversation(request);
+    }
+
+    @GetMapping
+    public List<ConversationDTO> getMyConversations() {
+        return conversationService.getMyConversations();
+    }
+
+    @PostMapping("/{conversationId}/messages")
+    public MessageDTO sendMessage(
+            @PathVariable Long conversationId,
+            @Valid @RequestBody SendMessageRequest request) {
+        return messageService.sendMessage(conversationId, request);
+    }
+
+    @GetMapping("/{conversationId}/messages")
+    public List<MessageDTO> getMessages(
+            @PathVariable Long conversationId,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        return messageService.getMessages(conversationId, page, size);
+    }
+}

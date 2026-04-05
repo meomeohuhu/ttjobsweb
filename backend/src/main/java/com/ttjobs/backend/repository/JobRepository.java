@@ -2,6 +2,7 @@ package com.ttjobs.backend.repository;
 
 import com.ttjobs.backend.entity.CompanyMember;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.domain.Page;
@@ -11,7 +12,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-public interface JobRepository extends JpaRepository<Job, Long> {
+public interface JobRepository extends JpaRepository<Job, Long>, JpaSpecificationExecutor<Job> {
 
     @Query("SELECT j FROM Job j WHERE j.deletedAt IS NULL AND j.company.deletedAt IS NULL AND " +
            "(:title IS NULL OR LOWER(j.title) LIKE LOWER(CONCAT('%', :title, '%'))) AND " +

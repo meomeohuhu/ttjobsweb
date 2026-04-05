@@ -65,7 +65,7 @@ class JobControllerApiTest {
         dto.setStatus("open");
 
         when(jobService.searchJobs(eq("Backend"), eq("HCM"), eq(null), eq("full_time"),
-                eq("mid"), eq("open"), eq(0), eq(20)))
+                eq("mid"), eq("open"), eq(null), eq(null), eq(null), eq(0), eq(20)))
                 .thenReturn(List.of(dto));
 
         mockMvc.perform(get("/api/jobs/search")
