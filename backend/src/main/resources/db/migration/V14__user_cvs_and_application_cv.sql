@@ -1,0 +1,12 @@
+CREATE TABLE IF NOT EXISTS user_cvs (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id),
+    cv_url VARCHAR(1000) NOT NULL,
+    file_name VARCHAR(255),
+    uploaded_at TIMESTAMP DEFAULT NOW()
+);
+
+ALTER TABLE job_applications
+    ADD COLUMN IF NOT EXISTS cv_url VARCHAR(1000),
+    ADD COLUMN IF NOT EXISTS cv_file_name VARCHAR(255),
+    ADD COLUMN IF NOT EXISTS cv_id BIGINT REFERENCES user_cvs(id);

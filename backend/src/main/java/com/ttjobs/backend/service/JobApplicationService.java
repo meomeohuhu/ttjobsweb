@@ -1,22 +1,31 @@
 package com.ttjobs.backend.service;
 
+import com.cloudinary.Cloudinary;
+import com.cloudinary.utils.ObjectUtils;
 import com.ttjobs.backend.dto.JobApplicationDTO;
 import com.ttjobs.backend.entity.CompanyMember;
 import com.ttjobs.backend.entity.Job;
 import com.ttjobs.backend.entity.JobApplication;
 import com.ttjobs.backend.entity.JobApplicationStatusAudit;
 import com.ttjobs.backend.entity.User;
+import com.ttjobs.backend.entity.UserCv;
 import com.ttjobs.backend.repository.JobApplicationRepository;
 import com.ttjobs.backend.repository.JobApplicationStatusAuditRepository;
 import com.ttjobs.backend.repository.JobRepository;
+import com.ttjobs.backend.repository.UserCvRepository;
 import com.ttjobs.backend.repository.UserRepository;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import jakarta.servlet.http.HttpServletResponse;
 import java.time.LocalDateTime;
+import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -35,6 +44,16 @@ public class JobApplicationService {
 
     private static final Set<String> RECRUITER_STATUS = Set.of(
             REVIEWING, SHORTLISTED, INTERVIEWED, OFFERED, HIRED, REJECTED
+    );
+    // CV limits and rules aligned with UserCvService.
+    private static final long MAX_CV_SIZE = 5L * 1024 * 1024;
+    private static final long STREAM_MAX_SIZE = 10L * 1024 * 1024;
+    private static final int DOWNLOAD_CONNECT_TIMEOUT_MS = 3000;
+    private static final int DOWNLOAD_READ_TIMEOUT_MS = 5000;
+    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     );
 
     @Autowired
@@ -59,6 +78,12 @@ public class JobApplicationService {
     private NotificationService notificationService;
     @Autowired
     private EmailService emailService;
+    @Autowired
+    private ObjectProvider<Cloudinary> cloudinaryProvider;
+    @Autowired
+    private CvTextExtractionService cvTextExtractionService;
+    @Autowired
+    private UserCvRepository userCvRepository;
 
     public List<JobApplicationDTO> getAllApplications() {
         User currentUser = authContextService.requireCurrentUser();
@@ -125,23 +150,18 @@ public class JobApplicationService {
                 .collect(Collectors.toList());
     }
 
-    public JobApplicationDTO applyForJob(Long userId, Long jobId) {
+    public JobApplicationDTO applyForJob(Long jobId, MultipartFile file, boolean useProfileCv, boolean saveToCvList) {
         User currentUser = authContextService.requireCurrentUser();
 
         if (currentUser.getRole() != User.Role.CANDIDATE) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only candidate can apply for jobs");
         }
-
-        if (!currentUser.getId().equals(userId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only apply for yourself");
-        }
-
-        Optional<JobApplication> existingApplication = jobApplicationRepository.findByUserIdAndJobId(userId, jobId);
+        Optional<JobApplication> existingApplication = jobApplicationRepository.findByUserIdAndJobId(currentUser.getId(), jobId);
         if (existingApplication.isPresent()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "User has already applied for this job");
         }
 
-        User user = userRepository.findById(userId)
+        User user = userRepository.findById(currentUser.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
         Job job = jobRepository.findByIdAndDeletedAtIsNull(jobId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
@@ -159,6 +179,8 @@ public class JobApplicationService {
         application.setJob(job);
         application.setApplicationDate(LocalDateTime.now());
         application.setStatus(SUBMITTED);
+        // Attach CV snapshot based on upload or saved CV list.
+        attachCvSnapshot(application, user, file, useProfileCv, saveToCvList);
         JobApplication saved = jobApplicationRepository.save(application);
         logStatusChange(saved, currentUser, null, SUBMITTED);
         notificationService.createNotification(
@@ -180,6 +202,20 @@ public class JobApplicationService {
             emailService.sendNewApplication(job.getCompany().getCreatedBy(), user, job);
         }
         return convertToDTO(saved);
+    }
+
+    public void streamCv(Long applicationId, HttpServletResponse response) {
+        User currentUser = authContextService.requireCurrentUser();
+        JobApplication application = jobApplicationRepository.findByIdWithDetails(applicationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Application not found"));
+
+        requireRecruiterOwnership(currentUser, application.getJob());
+
+        if (application.getCvUrl() == null || application.getCvUrl().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No CV attached to this application");
+        }
+
+        streamFromUrl(application.getCvUrl(), application.getCvFileName(), response);
     }
 
     public JobApplicationDTO updateApplicationStatus(Long applicationId, String status) {
@@ -324,6 +360,7 @@ public class JobApplicationService {
         dto.setId(application.getId());
         dto.setApplicationDate(application.getApplicationDate());
         dto.setStatus(application.getStatus());
+        dto.setHasCv(application.getCvUrl() != null && !application.getCvUrl().isBlank());
         if (application.getUser() != null) {
             dto.setUserId(application.getUser().getId());
             dto.setUserName(application.getUser().getName());
@@ -336,5 +373,152 @@ public class JobApplicationService {
             }
         }
         return dto;
+    }
+
+    private void attachCvSnapshot(JobApplication application, User user, MultipartFile file,
+                                  boolean useProfileCv, boolean saveToCvList) {
+        boolean hasFile = file != null && !file.isEmpty();
+        if (!hasFile && !useProfileCv) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Must provide a CV file or use profile CV");
+        }
+        if (hasFile && useProfileCv) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose either file upload or profile CV");
+        }
+        if (hasFile) {
+            validateCvFile(file);
+            Cloudinary cloudinary = requireCloudinary();
+            try {
+                Map<?, ?> result = cloudinary.uploader().upload(
+                        file.getBytes(),
+                        ObjectUtils.asMap(
+                                "folder", "ttjobs/cv/applications",
+                                "resource_type", "raw",
+                                "public_id", "app-" + user.getId() + "-" + System.currentTimeMillis(),
+                                "overwrite", true
+                        )
+                );
+                String cvUrl = (String) result.get("secure_url");
+                if (cvUrl == null || cvUrl.isBlank()) {
+                    throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Cloud upload failed");
+                }
+                application.setCvUrl(cvUrl);
+                application.setCvFileName(file.getOriginalFilename());
+
+                // Extract text for recommendation use.
+                String cvText = cvTextExtractionService.extractText(
+                        file.getBytes(),
+                        file.getContentType(),
+                        file.getOriginalFilename()
+                );
+                user.setCvText(cvText);
+                userRepository.save(user);
+
+                if (saveToCvList) {
+                    UserCv savedCv = saveUserCv(user, cvUrl, file.getOriginalFilename());
+                    application.setCv(savedCv);
+                }
+                return;
+            } catch (IOException e) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Cloud upload failed");
+            }
+        }
+
+        UserCv latestCv = userCvRepository.findTopByUserIdOrderByUploadedAtDesc(user.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "No profile CV found"));
+        application.setCvUrl(latestCv.getCvUrl());
+        application.setCvFileName(latestCv.getFileName());
+        application.setCv(latestCv);
+
+        if (user.getCvText() == null || user.getCvText().isBlank()) {
+            byte[] data = downloadCvBytes(latestCv.getCvUrl());
+            String cvText = cvTextExtractionService.extractText(data, null, latestCv.getFileName());
+            user.setCvText(cvText);
+            userRepository.save(user);
+        }
+    }
+
+    private void validateCvFile(MultipartFile file) {
+        if (file.getSize() > MAX_CV_SIZE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CV file size exceeds 5MB");
+        }
+        if (!ALLOWED_CONTENT_TYPES.contains(file.getContentType())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only PDF/DOC/DOCX files are allowed");
+        }
+    }
+
+    private Cloudinary requireCloudinary() {
+        Cloudinary cloudinary = cloudinaryProvider.getIfAvailable();
+        if (cloudinary == null) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Cloudinary is not configured");
+        }
+        return cloudinary;
+    }
+
+    private UserCv saveUserCv(User user, String cvUrl, String fileName) {
+        UserCv userCv = new UserCv();
+        userCv.setUser(user);
+        userCv.setCvUrl(cvUrl);
+        userCv.setFileName(fileName);
+        return userCvRepository.save(userCv);
+    }
+
+    private void streamFromUrl(String cvUrl, String fileName, HttpServletResponse response) {
+        try {
+            java.net.URLConnection connection = new java.net.URL(cvUrl).openConnection();
+            connection.setConnectTimeout(DOWNLOAD_CONNECT_TIMEOUT_MS);
+            connection.setReadTimeout(DOWNLOAD_READ_TIMEOUT_MS);
+            String contentType = connection.getContentType();
+            if (contentType == null || contentType.isBlank()) {
+                contentType = "application/octet-stream";
+            }
+            response.setContentType(contentType);
+            String safeName = (fileName == null || fileName.isBlank()) ? "cv" : fileName;
+            response.setHeader("Content-Disposition", "inline; filename=\"" + safeName + "\"");
+
+            try (java.io.InputStream input = connection.getInputStream();
+                 java.io.OutputStream output = response.getOutputStream()) {
+                byte[] buffer = new byte[8192];
+                int read;
+                long total = 0;
+                while ((read = input.read(buffer)) != -1) {
+                    total += read;
+                    if (total > STREAM_MAX_SIZE) {
+                        throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "CV file size exceeds 10MB");
+                    }
+                    output.write(buffer, 0, read);
+                }
+                output.flush();
+            }
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to stream CV");
+        }
+    }
+
+    private byte[] downloadCvBytes(String cvUrl) {
+        try {
+            java.net.URLConnection connection = new java.net.URL(cvUrl).openConnection();
+            connection.setConnectTimeout(DOWNLOAD_CONNECT_TIMEOUT_MS);
+            connection.setReadTimeout(DOWNLOAD_READ_TIMEOUT_MS);
+            try (java.io.InputStream input = connection.getInputStream()) {
+                return readLimited(input, MAX_CV_SIZE);
+            }
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to download CV");
+        }
+    }
+
+    private byte[] readLimited(java.io.InputStream input, long maxBytes) throws IOException {
+        java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
+        byte[] buffer = new byte[4096];
+        int read;
+        long total = 0;
+        while ((read = input.read(buffer)) != -1) {
+            total += read;
+            if (total > maxBytes) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CV file size exceeds 5MB");
+            }
+            output.write(buffer, 0, read);
+        }
+        return output.toByteArray();
     }
 }

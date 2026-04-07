@@ -1126,6 +1126,27 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/JobDTO'
+  /api/recommendations/cv-text:
+    post:
+      tags: [Jobs]
+      summary: Recommend jobs based on provided CV text (Candidate)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AiPredictionRequest'
+      responses:
+        "200":
+          description: Recommended jobs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/JobDTO'
   /api/conversations:
     post:
       tags: [Chat]
@@ -1597,6 +1618,11 @@ components:
         changedAt:
           type: string
           format: date-time
+    AiPredictionRequest:
+      type: object
+      properties:
+        cvText:
+          type: string
     ConversationDTO:
       type: object
       properties:

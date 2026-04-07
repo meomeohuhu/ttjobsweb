@@ -6,15 +6,18 @@ import com.ttjobs.backend.entity.Job;
 import com.ttjobs.backend.entity.JobApplication;
 import com.ttjobs.backend.entity.User;
 import com.ttjobs.backend.entity.JobApplicationStatusAudit;
+import com.ttjobs.backend.entity.UserCv;
 import com.ttjobs.backend.repository.JobApplicationRepository;
 import com.ttjobs.backend.repository.JobApplicationStatusAuditRepository;
 import com.ttjobs.backend.repository.JobRepository;
+import com.ttjobs.backend.repository.UserCvRepository;
 import com.ttjobs.backend.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
@@ -48,6 +51,12 @@ class JobApplicationServiceTest {
     private NotificationService notificationService;
     @Mock
     private EmailService emailService;
+    @Mock
+    private UserCvRepository userCvRepository;
+    @Mock
+    private ObjectProvider<com.cloudinary.Cloudinary> cloudinaryProvider;
+    @Mock
+    private CvTextExtractionService cvTextExtractionService;
 
     @InjectMocks
     private JobApplicationService jobApplicationService;
@@ -60,7 +69,7 @@ class JobApplicationServiceTest {
                 .thenReturn(Optional.of(new JobApplication()));
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> jobApplicationService.applyForJob(1L, 10L));
+                () -> jobApplicationService.applyForJob(10L, null, true, false));
 
         assertEquals(409, ex.getStatusCode().value());
     }
@@ -77,7 +86,7 @@ class JobApplicationServiceTest {
         when(jobRepository.findByIdAndDeletedAtIsNull(10L)).thenReturn(Optional.of(closedJob));
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> jobApplicationService.applyForJob(1L, 10L));
+                () -> jobApplicationService.applyForJob(10L, null, false, false));
 
         assertEquals(400, ex.getStatusCode().value());
     }
@@ -85,6 +94,7 @@ class JobApplicationServiceTest {
     @Test
     void applyForJob_shouldSendEmail_whenSuccess() {
         User currentUser = user(1L, User.Role.CANDIDATE);
+        currentUser.setCvText("existing text");
         User recruiter = user(2L, User.Role.RECRUITER);
         Company company = new Company();
         company.setCreatedBy(recruiter);
@@ -103,12 +113,17 @@ class JobApplicationServiceTest {
         application.setApplicationDate(LocalDateTime.now());
 
         when(authContextService.requireCurrentUser()).thenReturn(currentUser);
+        UserCv savedCv = new UserCv();
+        savedCv.setId(5L);
+        savedCv.setCvUrl("https://cv.test/url.pdf");
+        savedCv.setFileName("cv.pdf");
         when(jobApplicationRepository.findByUserIdAndJobId(1L, 10L)).thenReturn(Optional.empty());
         when(userRepository.findById(1L)).thenReturn(Optional.of(currentUser));
         when(jobRepository.findByIdAndDeletedAtIsNull(10L)).thenReturn(Optional.of(job));
+        when(userCvRepository.findTopByUserIdOrderByUploadedAtDesc(1L)).thenReturn(Optional.of(savedCv));
         when(jobApplicationRepository.save(org.mockito.ArgumentMatchers.any(JobApplication.class))).thenReturn(application);
 
-        JobApplicationDTO result = jobApplicationService.applyForJob(1L, 10L);
+        JobApplicationDTO result = jobApplicationService.applyForJob(10L, null, true, false);
         assertEquals(77L, result.getId());
         verify(emailService).sendApplicationSubmitted(currentUser, job);
         verify(emailService).sendNewApplication(recruiter, currentUser, job);
@@ -160,14 +175,20 @@ class JobApplicationServiceTest {
     }
 
     @Test
-    void applyForJob_shouldReturnForbidden_whenUserAppliesForAnotherUser() {
+    void applyForJob_shouldReturnBadRequest_whenMissingCvInput() {
         User currentUser = user(2L, User.Role.CANDIDATE);
+        Job job = new Job();
+        job.setStatus("open");
+
         when(authContextService.requireCurrentUser()).thenReturn(currentUser);
+        when(jobApplicationRepository.findByUserIdAndJobId(2L, 10L)).thenReturn(Optional.empty());
+        when(userRepository.findById(2L)).thenReturn(Optional.of(currentUser));
+        when(jobRepository.findByIdAndDeletedAtIsNull(10L)).thenReturn(Optional.of(job));
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> jobApplicationService.applyForJob(1L, 10L));
+                () -> jobApplicationService.applyForJob(10L, null, false, false));
 
-        assertEquals(403, ex.getStatusCode().value());
+        assertEquals(400, ex.getStatusCode().value());
     }
 
     @Test

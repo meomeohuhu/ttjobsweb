@@ -24,12 +24,18 @@ public class JobApplication {
     private LocalDateTime applicationDate;
     private String status;
     private LocalDateTime updatedAt;
+    // Snapshot CV info at apply time (do not expose URL via DTO).
+    private String cvUrl;
+    private String cvFileName;
 
     @ManyToOne
     @JoinColumn(name = "user_id")
     private User user;
 
-    
+    // Optional link to a saved CV in the user's CV list.
+    @ManyToOne
+    @JoinColumn(name = "cv_id")
+    private UserCv cv;
 
     @ManyToOne
     @JoinColumn(name = "job_id")
