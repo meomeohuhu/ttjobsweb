@@ -18,7 +18,7 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -54,8 +54,7 @@ class JobApplicationControllerApiTest {
 
     @Test
     void applyForJob_shouldReturnBadRequest_whenMissingJobId() throws Exception {
-        mockMvc.perform(post("/api/applications/apply")
-                        .param("userId", "1"))
+        mockMvc.perform(multipart("/api/applications/apply"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -65,11 +64,11 @@ class JobApplicationControllerApiTest {
         app.setId(20L);
         app.setStatus("submitted");
 
-        when(jobApplicationService.applyForJob(1L, 2L)).thenReturn(app);
+        when(jobApplicationService.applyForJob(2L, null, true, false)).thenReturn(app);
 
-        mockMvc.perform(post("/api/applications/apply")
-                        .param("userId", "1")
-                        .param("jobId", "2"))
+        mockMvc.perform(multipart("/api/applications/apply")
+                        .param("jobId", "2")
+                        .param("useProfileCv", "true"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(20))
                 .andExpect(jsonPath("$.status").value("submitted"));
@@ -117,5 +116,13 @@ class JobApplicationControllerApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(44))
                 .andExpect(jsonPath("$.status").value("withdrawn"));
+    }
+
+    @Test
+    void streamCv_shouldReturnOk() throws Exception {
+        doNothing().when(jobApplicationService).streamCv(eq(10L), org.mockito.ArgumentMatchers.any());
+
+        mockMvc.perform(get("/api/applications/10/cv-stream"))
+                .andExpect(status().isOk());
     }
 }

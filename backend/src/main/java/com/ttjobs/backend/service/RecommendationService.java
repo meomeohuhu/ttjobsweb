@@ -31,6 +31,32 @@ public class RecommendationService {
 
     private static final int TOP_CATEGORIES = 3;
     private static final int MAX_JOBS = 30;
+    private static final List<String> LABEL_MAPPING = List.of(
+            "ACCOUNTANT",
+            "ADVOCATE",
+            "AGRICULTURE",
+            "APPAREL",
+            "ARTS",
+            "AUTOMOBILE",
+            "AVIATION",
+            "BANKING",
+            "BPO",
+            "BUSINESS-DEVELOPMENT",
+            "CHEF",
+            "CONSTRUCTION",
+            "CONSULTANT",
+            "DESIGNER",
+            "DIGITAL-MEDIA",
+            "ENGINEERING",
+            "FINANCE",
+            "FITNESS",
+            "HEALTHCARE",
+            "HR",
+            "INFORMATION-TECHNOLOGY",
+            "PUBLIC-RELATIONS",
+            "SALES",
+            "TEACHER"
+    );
 
     @Autowired
     private AuthContextService authContextService;
@@ -54,8 +80,26 @@ public class RecommendationService {
         }
 
         List<AiPredictionDTO> predictions = fetchPredictions(currentUser.getCvText());
+        return findJobsFromPredictions(predictions);
+    }
+
+    public List<JobDTO> recommendByCvText(String cvText) {
+        User currentUser = authContextService.requireCurrentUser();
+        if (currentUser.getRole() != User.Role.CANDIDATE) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only candidate can request recommendations");
+        }
+        if (cvText == null || cvText.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "cvText is required");
+        }
+
+        List<AiPredictionDTO> predictions = fetchPredictions(cvText);
+        return findJobsFromPredictions(predictions);
+    }
+
+    private List<JobDTO> findJobsFromPredictions(List<AiPredictionDTO> predictions) {
         List<String> categories = predictions.stream()
                 .map(AiPredictionDTO::getCategory)
+                .map(this::mapLabelToCategory)
                 .filter(c -> c != null && !c.isBlank())
                 .limit(TOP_CATEGORIES)
                 .toList();
@@ -109,6 +153,25 @@ public class RecommendationService {
         } catch (Exception ex) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "AI service unavailable");
         }
+    }
+
+    private String mapLabelToCategory(String labelOrCategory) {
+        if (labelOrCategory == null || labelOrCategory.isBlank()) {
+            return null;
+        }
+        String value = labelOrCategory.trim();
+        if (value.startsWith("LABEL_")) {
+            try {
+                int index = Integer.parseInt(value.substring("LABEL_".length()));
+                if (index >= 0 && index < LABEL_MAPPING.size()) {
+                    return LABEL_MAPPING.get(index);
+                }
+                return null;
+            } catch (NumberFormatException ex) {
+                return null;
+            }
+        }
+        return value;
     }
 
     private JobDTO toDto(Job job) {

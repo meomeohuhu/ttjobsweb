@@ -6,7 +6,7 @@ services:
     container_name: ttjobs-postgres
     environment:
       POSTGRES_DB: ttjobs
-      POSTGRES_USER: postgres
+      POSTGRES_USER: postgres 
       POSTGRES_PASSWORD: admin
     ports:
       - "5432:5432"
@@ -35,6 +35,8 @@ services:
     container_name: ttjobs-ai
     ports:
       - "8000:8000"
+    volumes:
+      - ./ai-service/models:/app/models
 
 volumes:
   ttjobs_db:

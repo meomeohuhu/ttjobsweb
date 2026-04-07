@@ -1,12 +1,15 @@
 package com.ttjobs.backend.controller;
 
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import com.ttjobs.backend.dto.JobApplicationDTO;
 import com.ttjobs.backend.service.JobApplicationService;
+import org.springframework.http.MediaType;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -38,9 +41,14 @@ public class JobApplicationController {
         return jobApplicationService.getApplicationsForMyJobs();
     }
 
-    @PostMapping("/apply")
-    public JobApplicationDTO applyForJob(@RequestParam @NotNull Long userId, @RequestParam @NotNull Long jobId) {
-        return jobApplicationService.applyForJob(userId, jobId);
+    @PostMapping(value = "/apply", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public JobApplicationDTO applyForJob(
+            @RequestParam @NotNull Long jobId,
+            @RequestParam(required = false) MultipartFile file,
+            @RequestParam(defaultValue = "false") boolean useProfileCv,
+            @RequestParam(defaultValue = "false") boolean saveToCvList
+    ) {
+        return jobApplicationService.applyForJob(jobId, file, useProfileCv, saveToCvList);
     }
 
     @PutMapping("/{applicationId}/status")
@@ -62,5 +70,10 @@ public class JobApplicationController {
     @GetMapping("/{applicationId}/timeline")
     public List<com.ttjobs.backend.dto.ApplicationTimelineDTO> getTimeline(@PathVariable Long applicationId) {
         return jobApplicationService.getApplicationTimeline(applicationId);
+    }
+
+    @GetMapping("/{applicationId}/cv-stream")
+    public void streamCv(@PathVariable Long applicationId, HttpServletResponse response) {
+        jobApplicationService.streamCv(applicationId, response);
     }
 }

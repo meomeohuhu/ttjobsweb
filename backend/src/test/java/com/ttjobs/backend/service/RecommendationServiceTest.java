@@ -53,7 +53,7 @@ class RecommendationServiceTest {
         when(restTemplate.exchange(any(org.springframework.http.RequestEntity.class), any(Class.class)))
                 .thenReturn(ResponseEntity.ok("[[\"INFORMATION-TECHNOLOGY\",0.9]]"));
         when(objectMapper.readValue(any(String.class), any(com.fasterxml.jackson.core.type.TypeReference.class)))
-                .thenReturn(List.of(List.of("INFORMATION-TECHNOLOGY", 0.9)));
+                .thenReturn(List.of(List.of("LABEL_20", 0.9)));
         when(jobRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(PageRequest.class)))
                 .thenReturn(new PageImpl<>(List.of(job)));
 
@@ -62,5 +62,50 @@ class RecommendationServiceTest {
         List<JobDTO> result = recommendationService.recommendByCv();
         assertEquals(1, result.size());
         assertEquals("IT Job", result.get(0).getTitle());
+    }
+
+    @Test
+    void recommendByCvText_shouldReturnJobs() throws Exception {
+        User candidate = new User();
+        candidate.setId(3L);
+        candidate.setRole(User.Role.CANDIDATE);
+
+        Job job = new Job();
+        job.setId(20L);
+        job.setTitle("Finance Job");
+        job.setCategory("FINANCE");
+
+        when(authContextService.requireCurrentUser()).thenReturn(candidate);
+        when(restTemplate.exchange(any(org.springframework.http.RequestEntity.class), any(Class.class)))
+                .thenReturn(ResponseEntity.ok("[[\"LABEL_16\",0.8]]"));
+        when(objectMapper.readValue(any(String.class), any(com.fasterxml.jackson.core.type.TypeReference.class)))
+                .thenReturn(List.of(List.of("LABEL_16", 0.8)));
+        when(jobRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(List.of(job)));
+
+        ReflectionTestUtils.setField(recommendationService, "aiBaseUrl", "http://ai");
+
+        List<JobDTO> result = recommendationService.recommendByCvText("cv text");
+        assertEquals(1, result.size());
+        assertEquals("Finance Job", result.get(0).getTitle());
+    }
+
+    @Test
+    void recommendByCv_shouldIgnoreInvalidLabel() throws Exception {
+        User candidate = new User();
+        candidate.setId(2L);
+        candidate.setRole(User.Role.CANDIDATE);
+        candidate.setCvText("text");
+
+        when(authContextService.requireCurrentUser()).thenReturn(candidate);
+        when(restTemplate.exchange(any(org.springframework.http.RequestEntity.class), any(Class.class)))
+                .thenReturn(ResponseEntity.ok("[[\"LABEL_99\",0.9]]"));
+        when(objectMapper.readValue(any(String.class), any(com.fasterxml.jackson.core.type.TypeReference.class)))
+                .thenReturn(List.of(List.of("LABEL_99", 0.9)));
+
+        ReflectionTestUtils.setField(recommendationService, "aiBaseUrl", "http://ai");
+
+        List<JobDTO> result = recommendationService.recommendByCv();
+        assertEquals(0, result.size());
     }
 }
