@@ -22,4 +22,6 @@ public class JobDTO {
     private LocalDateTime applicationDeadline;
     private Long companyId;
     private String companyName;
+    private String companyLogoUrl;
+    private Long savedCount;
 }
