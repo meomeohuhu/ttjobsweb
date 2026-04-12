@@ -7,6 +7,7 @@ import com.ttjobs.backend.entity.User;
 import com.ttjobs.backend.repository.CompanyRepository;
 import com.ttjobs.backend.repository.JobRepository;
 import com.ttjobs.backend.repository.JobSpecifications;
+import com.ttjobs.backend.repository.JobWithSavedCount;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -45,16 +46,22 @@ public class JobService {
 
     public List<JobDTO> getAllJobs() {
         // Default candidate-facing list only shows open jobs.
-        return searchJobs(null, null, null, null, null, OPEN, 0, 50);
+        Pageable pageable = PageRequest.of(0, 50);
+        return jobRepository.findJobsWithSavedCount(OPEN, pageable)
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
     }
 
     public Optional<JobDTO> getJobById(Long id) {
         Job job = jobRepository.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
 
-        User currentUser = authContextService.requireCurrentUser();
-        if (!OPEN.equals(job.getStatus()) && !canManageJob(currentUser, job)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You cannot access this job");
+        User currentUser = authContextService.getCurrentUserOptional().orElse(null);
+        if (!OPEN.equals(job.getStatus())) {
+            if (currentUser == null || !canManageJob(currentUser, job)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You cannot access this job");
+            }
         }
 
         return Optional.of(convertToDTO(job));
@@ -311,7 +318,14 @@ public class JobService {
         if (job.getCompany() != null) {
             dto.setCompanyId(job.getCompany().getId());
             dto.setCompanyName(job.getCompany().getName());
+            dto.setCompanyLogoUrl(job.getCompany().getLogoUrl());
         }
+        return dto;
+    }
+
+    private JobDTO convertToDTO(JobWithSavedCount projection) {
+        JobDTO dto = convertToDTO(projection.getJob());
+        dto.setSavedCount(projection.getSavedCount());
         return dto;
     }
 }

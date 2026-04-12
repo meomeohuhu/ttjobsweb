@@ -5,8 +5,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
 import com.ttjobs.backend.entity.Job;
 import java.util.Collection;
 import java.util.List;
@@ -38,4 +38,10 @@ public interface JobRepository extends JpaRepository<Job, Long>, JpaSpecificatio
            "AND cm.memberRole IN :roles))")
     List<Job> findManagedJobsByRecruiterId(@Param("userId") Long userId,
                                            @Param("roles") Collection<CompanyMember.MemberRole> roles);
+
+    @Query("SELECT j as job, COUNT(sj.id) as savedCount " +
+           "FROM Job j LEFT JOIN SavedJob sj ON sj.job = j " +
+           "WHERE j.deletedAt IS NULL AND j.company.deletedAt IS NULL AND j.status = :status " +
+           "GROUP BY j")
+    List<JobWithSavedCount> findJobsWithSavedCount(@Param("status") String status, Pageable pageable);
 }
