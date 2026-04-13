@@ -980,33 +980,6 @@ paths:
           description: Removed successfully
         "404":
           description: Saved job not found
-    put:
-      tags: [Saved Jobs]
-      summary: Update saved job note/tag (Candidate)
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: jobId
-          required: true
-          schema:
-            type: integer
-            format: int64
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateSavedJobRequest'
-      responses:
-        "200":
-          description: Saved job updated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SavedJobDTO'
-        "404":
-          description: Saved job not found
   /api/notifications:
     get:
       tags: [Notifications]
@@ -1566,13 +1539,6 @@ components:
         savedAt:
           type: string
           format: date-time
-        note:
-          type: string
-        tag:
-          type: string
-    UpdateSavedJobRequest:
-      type: object
-      properties:
         note:
           type: string
         tag:

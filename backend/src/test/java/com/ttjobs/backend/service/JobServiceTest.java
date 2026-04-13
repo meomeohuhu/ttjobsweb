@@ -119,7 +119,7 @@ class JobServiceTest {
         job.setCompany(company);
         job.setStatus("closed");
 
-        when(authContextService.requireCurrentUser()).thenReturn(recruiter);
+        when(authContextService.getCurrentUserOptional()).thenReturn(Optional.of(recruiter));
         when(jobRepository.findByIdAndDeletedAtIsNull(99L)).thenReturn(Optional.of(job));
         when(companyAuthorizationService.canManageCompany(recruiter, company)).thenReturn(false);
 
