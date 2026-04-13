@@ -11,7 +11,12 @@ public class SavedJobDTO {
     private Long jobId;
     private String jobTitle;
     private String companyName;
+    private String companyLogoUrl;
     private String jobLocation;
+    private java.math.BigDecimal salaryMin;
+    private java.math.BigDecimal salaryMax;
+    private java.math.BigDecimal salary;
+    private String currency;
     private String jobStatus;
     private LocalDateTime savedAt;
     private String note;

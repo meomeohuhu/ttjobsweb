@@ -1,4 +1,4 @@
-﻿package com.ttjobs.backend.repository;
+package com.ttjobs.backend.repository;
 
 import com.ttjobs.backend.entity.Job;
 

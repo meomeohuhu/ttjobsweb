@@ -2,6 +2,7 @@ package com.ttjobs.backend.controller;
 
 import com.ttjobs.backend.dto.NotificationDTO;
 import com.ttjobs.backend.service.JwtService;
+import com.ttjobs.backend.service.NotificationPreferenceService;
 import com.ttjobs.backend.service.NotificationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +34,8 @@ class NotificationControllerApiTest {
     private NotificationService notificationService;
     @MockBean
     private JwtService jwtService;
+    @MockBean
+    private NotificationPreferenceService notificationPreferenceService;
 
     @Test
     void getMyNotifications_shouldReturnList() throws Exception {

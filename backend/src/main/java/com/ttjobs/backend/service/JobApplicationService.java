@@ -107,6 +107,17 @@ public class JobApplicationService {
                 .collect(Collectors.toList());
     }
 
+    public List<JobApplicationDTO> getMyApplications() {
+        User currentUser = authContextService.requireCurrentUser();
+        if (currentUser.getRole() != User.Role.CANDIDATE && !authContextService.isAdmin(currentUser)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only candidate can view applications");
+        }
+
+        return jobApplicationRepository.findByUserId(currentUser.getId()).stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
     public List<JobApplicationDTO> getApplicationsByJobId(Long jobId) {
         User currentUser = authContextService.requireCurrentUser();
 

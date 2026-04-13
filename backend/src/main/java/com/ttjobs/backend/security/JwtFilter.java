@@ -63,4 +63,24 @@ public class JwtFilter extends OncePerRequestFilter {
 
         filterChain.doFilter(request, response);
     }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        String method = request.getMethod();
+        if (path == null) {
+            return false;
+        }
+        if (path.startsWith("/api/auth/")) {
+            return true;
+        }
+        if (path.startsWith("/swagger-ui/") || path.startsWith("/v3/api-docs/")
+                || path.equals("/openapi.yaml") || path.equals("/actuator/health")) {
+            return true;
+        }
+        if ("GET".equalsIgnoreCase(method) && path.startsWith("/api/jobs")) {
+            return true;
+        }
+        return false;
+    }
 }

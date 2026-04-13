@@ -70,21 +70,6 @@ public class SavedJobService {
                 .collect(Collectors.toList());
     }
 
-    public SavedJobDTO updateSavedJob(Long jobId, String note, String tag) {
-        User currentUser = authContextService.requireCurrentUser();
-        if (currentUser.getRole() != User.Role.CANDIDATE) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only candidate can update saved jobs");
-        }
-
-        SavedJob savedJob = savedJobRepository.findByUserIdAndJobId(currentUser.getId(), jobId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Saved job not found"));
-
-        // Update note/tag for saved job.
-        savedJob.setNote(note);
-        savedJob.setTag(tag);
-        return toDto(savedJobRepository.save(savedJob));
-    }
-
     private SavedJobDTO toDto(SavedJob savedJob) {
         SavedJobDTO dto = new SavedJobDTO();
         dto.setId(savedJob.getId());
@@ -99,8 +84,13 @@ public class SavedJobService {
             dto.setJobTitle(savedJob.getJob().getTitle());
             dto.setJobLocation(savedJob.getJob().getLocation());
             dto.setJobStatus(savedJob.getJob().getStatus());
+            dto.setSalary(savedJob.getJob().getSalary());
+            dto.setSalaryMin(savedJob.getJob().getSalaryMin());
+            dto.setSalaryMax(savedJob.getJob().getSalaryMax());
+            dto.setCurrency(savedJob.getJob().getCurrency());
             if (savedJob.getJob().getCompany() != null) {
                 dto.setCompanyName(savedJob.getJob().getCompany().getName());
+                dto.setCompanyLogoUrl(savedJob.getJob().getCompany().getLogoUrl());
             }
         }
         return dto;

@@ -26,6 +26,11 @@ public class JobApplicationController {
         return jobApplicationService.getAllApplications();
     }
 
+    @GetMapping("/me")
+    public List<JobApplicationDTO> getMyApplications() {
+        return jobApplicationService.getMyApplications();
+    }
+
     @GetMapping("/user/{userId}")
     public List<JobApplicationDTO> getApplicationsByUserId(@PathVariable Long userId) {
         return jobApplicationService.getApplicationsByUserId(userId);
