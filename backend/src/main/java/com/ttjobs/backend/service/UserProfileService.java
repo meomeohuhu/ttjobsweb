@@ -1,14 +1,18 @@
 package com.ttjobs.backend.service;
 
 import com.ttjobs.backend.dto.UpdateMyProfileRequest;
+import com.ttjobs.backend.dto.ChangePasswordRequest;
 import com.ttjobs.backend.dto.UserProfileDTO;
 import com.ttjobs.backend.entity.Skill;
 import com.ttjobs.backend.entity.User;
 import com.ttjobs.backend.repository.SkillRepository;
 import com.ttjobs.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -54,6 +58,26 @@ public class UserProfileService {
         }
 
         return toDto(userRepository.save(currentUser));
+    }
+
+    @Transactional
+    public void changeMyPassword(ChangePasswordRequest request) {
+        User currentUser = authContextService.requireCurrentUser();
+
+        if (request.getNewPassword() == null || request.getConfirmPassword() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password fields are required");
+        }
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Passwords do not match");
+        }
+
+        BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+        if (!passwordEncoder.matches(request.getCurrentPassword(), currentUser.getPasswordHash())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Current password is incorrect");
+        }
+
+        currentUser.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(currentUser);
     }
 
     private List<Skill> resolveSkills(List<String> skillNames) {

@@ -105,6 +105,23 @@ paths:
                 $ref: '#/components/schemas/UserProfileDTO'
         "400":
           description: Validation error
+  /api/users/me/password:
+    put:
+      tags: [Users]
+      summary: Change current user's password
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        "204":
+          description: Password changed successfully
+        "400":
+          description: Validation error or incorrect current password
   /api/users/me/cv:
     get:
       tags: [Users]
@@ -1338,6 +1355,17 @@ components:
           items:
             type: string
             maxLength: 64
+    ChangePasswordRequest:
+      type: object
+      required: [currentPassword, newPassword, confirmPassword]
+      properties:
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+          minLength: 6
+        confirmPassword:
+          type: string
     UserAvatarDTO:
       type: object
       properties:
