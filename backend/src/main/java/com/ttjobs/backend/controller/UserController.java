@@ -4,13 +4,16 @@ import com.ttjobs.backend.dto.UserCvDTO;
 import com.ttjobs.backend.dto.UserCvTextDTO;
 import com.ttjobs.backend.dto.UserAvatarDTO;
 import com.ttjobs.backend.dto.UserProfileDTO;
+import com.ttjobs.backend.dto.ChangePasswordRequest;
 import com.ttjobs.backend.dto.UpdateMyProfileRequest;
 import com.ttjobs.backend.service.UserAvatarService;
 import com.ttjobs.backend.service.UserCvService;
 import com.ttjobs.backend.service.UserProfileService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -50,6 +53,12 @@ public class UserController {
     @PutMapping("/users/me")
     public UserProfileDTO updateMyProfile(@Valid @RequestBody UpdateMyProfileRequest request) {
         return userProfileService.updateMyProfile(request);
+    }
+
+    @PutMapping("/users/me/password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void changeMyPassword(@Valid @RequestBody ChangePasswordRequest request) {
+        userProfileService.changeMyPassword(request);
     }
 
     @GetMapping("/users/me/cv")
