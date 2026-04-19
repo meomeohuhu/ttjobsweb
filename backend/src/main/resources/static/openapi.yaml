@@ -367,6 +367,26 @@ paths:
                 $ref: '#/components/schemas/CompanyDTO'
         "404":
           description: Company not found
+  /api/companies/{companyId}/public-page:
+    get:
+      tags: [Companies]
+      summary: Get public company page payload
+      parameters:
+        - in: path
+          name: companyId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Company page payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyPublicPageDTO'
+        "404":
+          description: Company not found
     put:
       tags: [Companies]
       summary: Update company (Owner recruiter/Admin)
@@ -1390,6 +1410,23 @@ components:
           type: string
         industry:
           type: string
+        logoUrl:
+          type: string
+        jobCount:
+          type: integer
+          format: int64
+        savedJobCount:
+          type: integer
+          format: int64
+    CompanyPublicPageDTO:
+      type: object
+      properties:
+        company:
+          $ref: '#/components/schemas/CompanyDTO'
+        jobs:
+          type: array
+          items:
+            $ref: '#/components/schemas/JobDTO'
     CompanyWriteRequest:
       type: object
       properties:
@@ -1481,6 +1518,11 @@ components:
           format: int64
         companyName:
           type: string
+        companyLogoUrl:
+          type: string
+        savedCount:
+          type: integer
+          format: int64
     JobWriteRequest:
       type: object
       properties:

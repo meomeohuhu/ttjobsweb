@@ -39,6 +39,12 @@ public class SecurityConfig {
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/openapi.yaml", "/actuator/health").permitAll()
                 // Public job listings and job detail.
                 .requestMatchers(HttpMethod.GET, "/api/jobs/**").permitAll()
+                // Public company pages.
+                .requestMatchers(HttpMethod.GET, "/api/companies/**").permitAll()
+                // Authenticated company follow actions.
+                .requestMatchers("/api/company-follows/**").authenticated()
+                // Recruiter dashboard and future recruiter workspace routes.
+                .requestMatchers("/api/recruiter/**").authenticated()
                 // Only users with ROLE_ADMIN can access admin routes.
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 // Any authenticated user can access user profile routes.

@@ -25,9 +25,13 @@ import org.springframework.http.RequestEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class RecommendationService {
+
+    private static final Logger log = LoggerFactory.getLogger(RecommendationService.class);
 
     private static final int TOP_CATEGORIES = 3;
     private static final int MAX_JOBS = 30;
@@ -151,7 +155,8 @@ public class RecommendationService {
             }
             return predictions;
         } catch (Exception ex) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "AI service unavailable");
+            log.warn("AI service unavailable, returning empty recommendations. cause={}", ex.toString());
+            return List.of();
         }
     }
 

@@ -1,8 +1,11 @@
 package com.ttjobs.backend.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ttjobs.backend.dto.CompanyDTO;
 import com.ttjobs.backend.dto.CompanyMemberDTO;
 import com.ttjobs.backend.dto.CompanyMemberUpsertRequest;
+import com.ttjobs.backend.dto.CompanyPublicPageDTO;
+import com.ttjobs.backend.dto.JobDTO;
 import com.ttjobs.backend.service.CompanyService;
 import com.ttjobs.backend.service.JwtService;
 import org.junit.jupiter.api.Test;
@@ -40,6 +43,63 @@ class CompanyControllerApiTest {
     private CompanyService companyService;
     @MockBean
     private JwtService jwtService;
+
+    @Test
+    void getTopCompaniesBySavedJobs_shouldReturnList() throws Exception {
+        CompanyDTO dto = new CompanyDTO();
+        dto.setId(7L);
+        dto.setName("Acme");
+        dto.setJobCount(12L);
+        dto.setSavedJobCount(34L);
+
+        when(companyService.getTopCompaniesBySavedJobs(2)).thenReturn(List.of(dto));
+
+        mockMvc.perform(get("/api/companies/top-saved-jobs?limit=2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(7))
+                .andExpect(jsonPath("$[0].name").value("Acme"))
+                .andExpect(jsonPath("$[0].savedJobCount").value(34));
+    }
+
+    @Test
+    void getPublicCompanyJobs_shouldReturnList() throws Exception {
+        JobDTO dto = new JobDTO();
+        dto.setId(100L);
+        dto.setTitle("Java Developer");
+        dto.setCompanyName("Acme");
+
+        when(companyService.getPublicCompanyJobs(3L)).thenReturn(List.of(dto));
+
+        mockMvc.perform(get("/api/companies/3/jobs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(100))
+                .andExpect(jsonPath("$[0].title").value("Java Developer"))
+                .andExpect(jsonPath("$[0].companyName").value("Acme"));
+    }
+
+    @Test
+    void getPublicCompanyPage_shouldReturnPayload() throws Exception {
+        CompanyDTO company = new CompanyDTO();
+        company.setId(7L);
+        company.setName("Acme");
+        company.setSavedJobCount(34L);
+
+        JobDTO job = new JobDTO();
+        job.setId(100L);
+        job.setTitle("Java Developer");
+
+        CompanyPublicPageDTO payload = new CompanyPublicPageDTO();
+        payload.setCompany(company);
+        payload.setJobs(List.of(job));
+
+        when(companyService.getPublicCompanyPage(7L)).thenReturn(payload);
+
+        mockMvc.perform(get("/api/companies/7/public-page"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.company.id").value(7))
+                .andExpect(jsonPath("$.company.name").value("Acme"))
+                .andExpect(jsonPath("$.jobs[0].title").value("Java Developer"));
+    }
 
     @Test
     void getCompanyMembers_shouldReturnList() throws Exception {

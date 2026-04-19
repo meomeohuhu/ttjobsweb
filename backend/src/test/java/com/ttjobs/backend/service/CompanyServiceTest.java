@@ -1,23 +1,29 @@
 package com.ttjobs.backend.service;
 
 import com.ttjobs.backend.dto.CompanyMemberUpsertRequest;
+import com.ttjobs.backend.dto.CompanyPublicPageDTO;
 import com.ttjobs.backend.entity.Company;
 import com.ttjobs.backend.entity.CompanyMember;
+import com.ttjobs.backend.entity.Job;
 import com.ttjobs.backend.entity.User;
 import com.ttjobs.backend.repository.CompanyMemberRepository;
 import com.ttjobs.backend.repository.CompanyRepository;
+import com.ttjobs.backend.repository.JobRepository;
 import com.ttjobs.backend.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
@@ -35,6 +41,8 @@ class CompanyServiceTest {
     private UserRepository userRepository;
     @Mock
     private CompanyAuthorizationService companyAuthorizationService;
+    @Mock
+    private JobRepository jobRepository;
 
     @InjectMocks
     private CompanyService companyService;
@@ -167,6 +175,94 @@ class CompanyServiceTest {
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
                 () -> companyService.removeCompanyMember(10L, 44L));
         assertEquals(400, ex.getStatusCode().value());
+    }
+
+    @Test
+    void getTopCompaniesBySavedJobs_shouldSortBySavedCount() {
+        Company first = company(1L, null);
+        first.setName("Alpha");
+        Company second = company(2L, null);
+        second.setName("Beta");
+
+        when(companyRepository.findByDeletedAtIsNull()).thenReturn(java.util.List.of(first, second));
+        when(jobRepository.countByCompanyIdAndStatus(1L, "open")).thenReturn(5L);
+        when(jobRepository.countByCompanyIdAndStatus(2L, "open")).thenReturn(10L);
+        when(jobRepository.countSavedJobsByCompanyId(1L)).thenReturn(30L);
+        when(jobRepository.countSavedJobsByCompanyId(2L)).thenReturn(12L);
+
+        var result = companyService.getTopCompaniesBySavedJobs(2);
+
+        assertEquals(2, result.size());
+        assertEquals("Alpha", result.get(0).getName());
+        assertEquals(30L, result.get(0).getSavedJobCount());
+        assertEquals("Beta", result.get(1).getName());
+    }
+
+    @Test
+    void getPublicCompanyJobs_shouldReturnOpenJobs() {
+        Company company = company(9L, null);
+        company.setName("Acme");
+
+        Job job = new Job();
+        job.setId(101L);
+        job.setTitle("Backend Engineer");
+        job.setStatus("open");
+        job.setCompany(company);
+
+        when(companyRepository.findByIdAndDeletedAtIsNull(9L)).thenReturn(Optional.of(company));
+        when(jobRepository.findCompanyJobsWithSavedCount(eq(9L), eq("open"), org.mockito.ArgumentMatchers.any(Pageable.class)))
+                .thenReturn(java.util.List.of(new com.ttjobs.backend.repository.JobWithSavedCount() {
+                    @Override
+                    public Job getJob() {
+                        return job;
+                    }
+
+                    @Override
+                    public Long getSavedCount() {
+                        return 7L;
+                    }
+                }));
+
+        var jobs = companyService.getPublicCompanyJobs(9L);
+
+        assertEquals(1, jobs.size());
+        assertEquals("Backend Engineer", jobs.get(0).getTitle());
+        assertEquals(7L, jobs.get(0).getSavedCount());
+        assertTrue(jobs.get(0).getCompanyName().contains("Acme"));
+    }
+
+    @Test
+    void getPublicCompanyPage_shouldReturnCompanyAndJobs() {
+        Company company = company(9L, null);
+        company.setName("Acme");
+        company.setLogoUrl("https://cdn.example.com/logo.png");
+
+        Job job = new Job();
+        job.setId(101L);
+        job.setTitle("Backend Engineer");
+        job.setStatus("open");
+        job.setCompany(company);
+
+        when(companyRepository.findByIdAndDeletedAtIsNull(9L)).thenReturn(Optional.of(company));
+        when(jobRepository.findCompanyJobsWithSavedCount(eq(9L), eq("open"), org.mockito.ArgumentMatchers.any(Pageable.class)))
+                .thenReturn(java.util.List.of(new com.ttjobs.backend.repository.JobWithSavedCount() {
+                    @Override
+                    public Job getJob() {
+                        return job;
+                    }
+
+                    @Override
+                    public Long getSavedCount() {
+                        return 3L;
+                    }
+                }));
+
+        CompanyPublicPageDTO payload = companyService.getPublicCompanyPage(9L);
+
+        assertEquals("Acme", payload.getCompany().getName());
+        assertEquals("https://cdn.example.com/logo.png", payload.getCompany().getLogoUrl());
+        assertEquals(1, payload.getJobs().size());
+        assertEquals("Backend Engineer", payload.getJobs().get(0).getTitle());
     }
 
     private User user(Long id, User.Role role) {

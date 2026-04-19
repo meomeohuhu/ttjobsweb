@@ -3,18 +3,27 @@ package com.ttjobs.backend.service;
 import com.ttjobs.backend.dto.CompanyDTO;
 import com.ttjobs.backend.dto.CompanyMemberDTO;
 import com.ttjobs.backend.dto.CompanyMemberUpsertRequest;
+import com.ttjobs.backend.dto.CompanyPublicPageDTO;
+import com.ttjobs.backend.dto.JobDTO;
 import com.ttjobs.backend.entity.Company;
 import com.ttjobs.backend.entity.CompanyMember;
+import com.ttjobs.backend.entity.Job;
 import com.ttjobs.backend.entity.User;
 import com.ttjobs.backend.repository.CompanyMemberRepository;
+import com.ttjobs.backend.repository.CompanyFollowRepository;
 import com.ttjobs.backend.repository.CompanyRepository;
+import com.ttjobs.backend.repository.JobRepository;
+import com.ttjobs.backend.repository.JobWithSavedCount;
 import com.ttjobs.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -29,6 +38,9 @@ public class CompanyService {
     private CompanyMemberRepository companyMemberRepository;
 
     @Autowired
+    private CompanyFollowRepository companyFollowRepository;
+
+    @Autowired
     private AuthContextService authContextService;
 
     @Autowired
@@ -36,6 +48,9 @@ public class CompanyService {
 
     @Autowired
     private CompanyAuthorizationService companyAuthorizationService;
+
+    @Autowired
+    private JobRepository jobRepository;
 
     public List<CompanyDTO> getAllCompanies() {
         // Public company listing for authenticated users.
@@ -46,6 +61,44 @@ public class CompanyService {
 
     public Optional<CompanyDTO> getCompanyById(Long id) {
         return companyRepository.findByIdAndDeletedAtIsNull(id).map(this::convertToDTO);
+    }
+
+    public List<CompanyDTO> getTopCompaniesBySavedJobs(int limit) {
+        int safeLimit = Math.max(limit, 1);
+        Comparator<CompanyDTO> comparator = Comparator
+                .comparingLong(CompanyDTO::getSavedJobCount)
+                .reversed()
+                .thenComparing(Comparator.comparingLong(CompanyDTO::getJobCount).reversed())
+                .thenComparing(company -> company.getName() == null ? "" : company.getName().toLowerCase());
+
+        return companyRepository.findByDeletedAtIsNull().stream()
+                .map(this::convertToDTO)
+                .sorted(comparator)
+                .limit(safeLimit)
+                .collect(Collectors.toList());
+    }
+
+    public List<JobDTO> getPublicCompanyJobs(Long companyId) {
+        Company company = companyRepository.findByIdAndDeletedAtIsNull(companyId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Company not found"));
+
+        Pageable pageable = PageRequest.of(0, 20);
+        return jobRepository.findCompanyJobsWithSavedCount(company.getId(), "open", pageable).stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    public CompanyPublicPageDTO getPublicCompanyPage(Long companyId) {
+        Company company = companyRepository.findByIdAndDeletedAtIsNull(companyId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Company not found"));
+
+        Pageable pageable = PageRequest.of(0, 20);
+        CompanyPublicPageDTO dto = new CompanyPublicPageDTO();
+        dto.setCompany(convertToDTO(company));
+        dto.setJobs(jobRepository.findCompanyJobsWithSavedCount(company.getId(), "open", pageable).stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList()));
+        return dto;
     }
 
     public CompanyDTO createCompany(Company company) {
@@ -237,6 +290,36 @@ public class CompanyService {
         dto.setLocation(company.getLocation());
         dto.setWebsite(company.getWebsite());
         dto.setIndustry(company.getIndustry());
+        dto.setLogoUrl(company.getLogoUrl());
+        dto.setJobCount(jobRepository.countByCompanyIdAndStatus(company.getId(), "open"));
+        dto.setSavedJobCount(jobRepository.countSavedJobsByCompanyId(company.getId()));
+        dto.setFollowerCount(companyFollowRepository.countByCompanyId(company.getId()));
+        return dto;
+    }
+
+    private JobDTO convertToDTO(JobWithSavedCount projection) {
+        JobDTO dto = new JobDTO();
+        Job job = projection.getJob();
+        dto.setId(job.getId());
+        dto.setTitle(job.getTitle());
+        dto.setDescription(job.getDescription());
+        dto.setLocation(job.getLocation());
+        dto.setSalary(job.getSalary());
+        dto.setSalaryMin(job.getSalaryMin());
+        dto.setSalaryMax(job.getSalaryMax());
+        dto.setCurrency(job.getCurrency());
+        dto.setJobType(job.getJobType());
+        dto.setExperienceLevel(job.getExperienceLevel());
+        dto.setCategory(job.getCategory());
+        dto.setStatus(job.getStatus());
+        dto.setPostedDate(job.getPostedDate());
+        dto.setApplicationDeadline(job.getApplicationDeadline());
+        if (job.getCompany() != null) {
+            dto.setCompanyId(job.getCompany().getId());
+            dto.setCompanyName(job.getCompany().getName());
+            dto.setCompanyLogoUrl(job.getCompany().getLogoUrl());
+        }
+        dto.setSavedCount(projection.getSavedCount());
         return dto;
     }
 

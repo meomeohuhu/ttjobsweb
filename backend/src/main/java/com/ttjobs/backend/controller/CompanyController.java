@@ -7,6 +7,8 @@ import com.ttjobs.backend.entity.Company;
 import com.ttjobs.backend.dto.CompanyDTO;
 import com.ttjobs.backend.dto.CompanyMemberDTO;
 import com.ttjobs.backend.dto.CompanyMemberUpsertRequest;
+import com.ttjobs.backend.dto.CompanyPublicPageDTO;
+import com.ttjobs.backend.dto.JobDTO;
 import com.ttjobs.backend.service.CompanyService;
 import java.util.List;
 
@@ -22,10 +24,25 @@ public class CompanyController {
         return companyService.getAllCompanies();
     }
 
+    @GetMapping("/top-saved-jobs")
+    public List<CompanyDTO> getTopCompaniesBySavedJobs(@RequestParam(defaultValue = "6") int limit) {
+        return companyService.getTopCompaniesBySavedJobs(limit);
+    }
+
     @GetMapping("/{id}")
     public CompanyDTO getCompanyById(@PathVariable Long id) {
         return companyService.getCompanyById(id)
                 .orElseThrow(() -> new RuntimeException("Company not found"));
+    }
+
+    @GetMapping("/{companyId}/jobs")
+    public List<JobDTO> getPublicCompanyJobs(@PathVariable Long companyId) {
+        return companyService.getPublicCompanyJobs(companyId);
+    }
+
+    @GetMapping("/{companyId}/public-page")
+    public CompanyPublicPageDTO getPublicCompanyPage(@PathVariable Long companyId) {
+        return companyService.getPublicCompanyPage(companyId);
     }
 
     @PostMapping

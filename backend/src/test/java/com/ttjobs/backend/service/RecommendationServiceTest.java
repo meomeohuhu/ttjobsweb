@@ -16,6 +16,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClientException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
@@ -108,4 +109,22 @@ class RecommendationServiceTest {
         List<JobDTO> result = recommendationService.recommendByCv();
         assertEquals(0, result.size());
     }
+
+    @Test
+    void recommendByCvText_shouldFallbackToEmptyListWhenAiServiceFails() {
+        User candidate = new User();
+        candidate.setId(4L);
+        candidate.setRole(User.Role.CANDIDATE);
+
+        when(authContextService.requireCurrentUser()).thenReturn(candidate);
+        when(restTemplate.exchange(any(org.springframework.http.RequestEntity.class), any(Class.class)))
+                .thenThrow(new RestClientException("down"));
+
+        ReflectionTestUtils.setField(recommendationService, "aiBaseUrl", "http://ai");
+
+        List<JobDTO> result = recommendationService.recommendByCvText("cv text");
+
+        assertEquals(0, result.size());
+    }
+
 }
