@@ -32,6 +32,26 @@ public interface JobRepository extends JpaRepository<Job, Long>, JpaSpecificatio
     Optional<Job> findByIdAndDeletedAtIsNull(Long id);
     List<Job> findByCompanyIdAndDeletedAtIsNull(Long companyId);
     List<Job> findByCompanyCreatedById(Long createdById);
+
+    @Query("SELECT COUNT(j.id) FROM Job j " +
+           "WHERE j.deletedAt IS NULL AND j.company.deletedAt IS NULL AND " +
+           "j.company.id = :companyId AND LOWER(j.status) = LOWER(:status)")
+    long countByCompanyIdAndStatus(@Param("companyId") Long companyId, @Param("status") String status);
+
+    @Query("SELECT COUNT(sj.id) FROM SavedJob sj " +
+           "WHERE sj.job.deletedAt IS NULL AND sj.job.company.deletedAt IS NULL AND " +
+           "sj.job.company.id = :companyId")
+    long countSavedJobsByCompanyId(@Param("companyId") Long companyId);
+
+    @Query("SELECT j as job, COUNT(sj.id) as savedCount " +
+           "FROM Job j LEFT JOIN SavedJob sj ON sj.job = j " +
+           "WHERE j.deletedAt IS NULL AND j.company.deletedAt IS NULL AND " +
+           "j.company.id = :companyId AND LOWER(j.status) = LOWER(:status) " +
+           "GROUP BY j ORDER BY j.postedDate DESC")
+    List<JobWithSavedCount> findCompanyJobsWithSavedCount(@Param("companyId") Long companyId,
+                                                          @Param("status") String status,
+                                                          Pageable pageable);
+
     @Query("SELECT j FROM Job j WHERE j.deletedAt IS NULL AND j.company.deletedAt IS NULL AND " +
            "(j.company.createdBy.id = :userId OR EXISTS (" +
            "SELECT 1 FROM CompanyMember cm WHERE cm.company.id = j.company.id AND cm.user.id = :userId " +
