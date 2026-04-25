@@ -35,6 +35,20 @@ build/
 ### Secrets ###
 .env
 .env.*
+!.env.example
+!.env.*.example
 src/main/resources/application-secret.properties
+src/main/resources/application-local.properties
+src/main/resources/application-*.local.properties
 src/main/resources/cloudinary.properties
 src/main/resources/*secret*.properties
+!src/main/resources/application-secret.example.properties
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+hs_err_pid*.log
+replay_pid*.log
+*.dump
+*.dumpstream

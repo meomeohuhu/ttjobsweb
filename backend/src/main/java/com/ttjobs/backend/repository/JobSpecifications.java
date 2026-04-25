@@ -102,4 +102,18 @@ public final class JobSpecifications {
         };
     }
 
+    public static Specification<Job> remoteFriendly() {
+        return (root, query, cb) -> {
+            String remote = "%remote%";
+            String online = "%online%";
+            String hybrid = "%hybrid%";
+            return cb.or(
+                    cb.like(cb.lower(root.get("location")), remote),
+                    cb.like(cb.lower(root.get("location")), online),
+                    cb.like(cb.lower(root.get("description")), remote),
+                    cb.like(cb.lower(root.get("description")), hybrid)
+            );
+        };
+    }
+
 }

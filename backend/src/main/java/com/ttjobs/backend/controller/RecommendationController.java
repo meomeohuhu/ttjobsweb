@@ -7,6 +7,7 @@ import com.ttjobs.backend.service.RecommendationService;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -26,6 +27,11 @@ public class RecommendationController {
     @PostMapping("/cv")
     public List<JobDTO> recommendByCv() {
         return recommendationService.recommendByCv();
+    }
+
+    @GetMapping("/job-needs")
+    public List<JobDTO> recommendByJobNeeds() {
+        return recommendationService.recommendByJobNeeds();
     }
 
     @PostMapping(value = "/cv-text", consumes = {MediaType.APPLICATION_JSON_VALUE, MediaType.TEXT_PLAIN_VALUE, MediaType.ALL_VALUE})

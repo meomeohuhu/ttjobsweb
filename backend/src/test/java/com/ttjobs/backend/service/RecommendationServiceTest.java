@@ -2,6 +2,7 @@ package com.ttjobs.backend.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ttjobs.backend.dto.JobDTO;
+import com.ttjobs.backend.entity.JobNeedPreference;
 import com.ttjobs.backend.entity.Job;
 import com.ttjobs.backend.entity.User;
 import com.ttjobs.backend.repository.JobRepository;
@@ -28,6 +29,8 @@ class RecommendationServiceTest {
 
     @Mock
     private AuthContextService authContextService;
+    @Mock
+    private JobNeedPreferenceService jobNeedPreferenceService;
     @Mock
     private JobRepository jobRepository;
     @Mock
@@ -125,6 +128,38 @@ class RecommendationServiceTest {
         List<JobDTO> result = recommendationService.recommendByCvText("cv text");
 
         assertEquals(0, result.size());
+    }
+
+    @Test
+    void recommendByJobNeeds_shouldReturnJobs() {
+        User candidate = new User();
+        candidate.setId(5L);
+        candidate.setRole(User.Role.CANDIDATE);
+
+        JobNeedPreference preference = new JobNeedPreference();
+        preference.setUserId(5L);
+        preference.setDesiredTitle("Backend");
+        preference.setDesiredLocation("Hà Nội");
+        preference.setRemoteOnly(true);
+
+        Job job = new Job();
+        job.setId(30L);
+        job.setTitle("Backend Engineer");
+        job.setLocation("Hà Nội");
+        job.setStatus("open");
+        job.setCategory("INFORMATION-TECHNOLOGY");
+        job.setDescription("Remote backend role");
+
+        when(authContextService.requireCurrentUser()).thenReturn(candidate);
+        when(jobNeedPreferenceService.getOrCreate(5L)).thenReturn(preference);
+        when(jobNeedPreferenceService.hasConfiguredCriteria(preference)).thenReturn(true);
+        when(jobRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(List.of(job)));
+
+        List<JobDTO> result = recommendationService.recommendByJobNeeds();
+
+        assertEquals(1, result.size());
+        assertEquals("Backend Engineer", result.get(0).getTitle());
     }
 
 }

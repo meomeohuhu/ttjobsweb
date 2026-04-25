@@ -3,6 +3,7 @@ package com.ttjobs.backend.repository;
 import com.ttjobs.backend.entity.ConversationMember;
 import com.ttjobs.backend.entity.ConversationMemberId;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ConversationMemberRepository extends JpaRepository<ConversationMember, ConversationMemberId> {
@@ -10,4 +11,5 @@ public interface ConversationMemberRepository extends JpaRepository<Conversation
     List<ConversationMember> findByIdUserId(Long userId);
     List<ConversationMember> findByIdConversationId(Long conversationId);
     List<ConversationMember> findByIdConversationIdIn(List<Long> conversationIds);
+    Optional<ConversationMember> findByIdConversationIdAndIdUserId(Long conversationId, Long userId);
 }

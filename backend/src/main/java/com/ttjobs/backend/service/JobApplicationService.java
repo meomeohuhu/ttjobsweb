@@ -76,6 +76,10 @@ public class JobApplicationService {
 
     @Autowired
     private NotificationService notificationService;
+
+    @Autowired
+    private RecruiterActivityLogService recruiterActivityLogService;
+
     @Autowired
     private EmailService emailService;
     @Autowired
@@ -226,6 +230,7 @@ public class JobApplicationService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No CV attached to this application");
         }
 
+        recruiterActivityLogService.logCvViewed(currentUser, application);
         streamFromUrl(application.getCvUrl(), application.getCvFileName(), response);
     }
 
@@ -247,6 +252,7 @@ public class JobApplicationService {
         application.setStatus(targetStatus);
         JobApplication saved = jobApplicationRepository.save(application);
         logStatusChange(saved, currentUser, currentStatus, targetStatus);
+        recruiterActivityLogService.logApplicationStatusChanged(currentUser, saved, currentStatus, targetStatus);
         notificationService.createNotification(
                 saved.getUser(),
                 "Application status updated",

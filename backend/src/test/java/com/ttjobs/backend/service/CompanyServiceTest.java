@@ -6,6 +6,7 @@ import com.ttjobs.backend.entity.Company;
 import com.ttjobs.backend.entity.CompanyMember;
 import com.ttjobs.backend.entity.Job;
 import com.ttjobs.backend.entity.User;
+import com.ttjobs.backend.repository.CompanyFollowRepository;
 import com.ttjobs.backend.repository.CompanyMemberRepository;
 import com.ttjobs.backend.repository.CompanyRepository;
 import com.ttjobs.backend.repository.JobRepository;
@@ -43,6 +44,8 @@ class CompanyServiceTest {
     private CompanyAuthorizationService companyAuthorizationService;
     @Mock
     private JobRepository jobRepository;
+    @Mock
+    private CompanyFollowRepository companyFollowRepository;
 
     @InjectMocks
     private CompanyService companyService;

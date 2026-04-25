@@ -1,6 +1,7 @@
 package com.ttjobs.backend.service;
 
 import com.ttjobs.backend.dto.JobApplicationDTO;
+import com.ttjobs.backend.dto.RecruiterActivityLogDTO;
 import com.ttjobs.backend.dto.RecruiterDashboardCompanyDTO;
 import com.ttjobs.backend.dto.RecruiterDashboardDTO;
 import com.ttjobs.backend.dto.RecruiterDashboardJobDTO;
@@ -47,6 +48,9 @@ public class RecruiterDashboardService {
     @Autowired
     private CompanyMemberRepository companyMemberRepository;
 
+    @Autowired
+    private RecruiterActivityLogService recruiterActivityLogService;
+
     public RecruiterDashboardDTO getDashboard() {
         User currentUser = authContextService.requireCurrentUser();
         if (currentUser.getRole() != User.Role.RECRUITER && !authContextService.isAdmin(currentUser)) {
@@ -64,7 +68,12 @@ public class RecruiterDashboardService {
         dto.setExpiringSoonJobs(mapExpiringSoonJobs(managedJobs, managedApplications, 14));
         dto.setRecentApplications(mapRecentApplications(managedApplications, 6));
         dto.setManagedCompanies(mapManagedCompanies(managedJobs, currentUser));
+        dto.setRecentActivities(recruiterActivityLogService.getRecentActivities(8));
         return dto;
+    }
+
+    public List<RecruiterActivityLogDTO> getRecentActivities(int limit) {
+        return recruiterActivityLogService.getRecentActivities(limit);
     }
 
     private List<Job> loadManagedJobs(User currentUser) {

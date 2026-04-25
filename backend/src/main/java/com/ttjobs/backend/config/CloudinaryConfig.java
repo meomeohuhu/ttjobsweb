@@ -3,8 +3,6 @@ package com.ttjobs.backend.config;
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
 
-import lombok.val;
-
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Bean;
@@ -41,9 +39,12 @@ public class CloudinaryConfig {
         @Override
         public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
             Environment env = context.getEnvironment();
-            return hasText(env.getProperty("CLOUDINARY_CLOUD_NAME"))
+            return (hasText(env.getProperty("cloudinary.cloud-name"))
+                    && hasText(env.getProperty("cloudinary.api-key"))
+                    && hasText(env.getProperty("cloudinary.api-secret")))
+                    || (hasText(env.getProperty("CLOUDINARY_CLOUD_NAME"))
                     && hasText(env.getProperty("CLOUDINARY_API_KEY"))
-                    && hasText(env.getProperty("CLOUDINARY_API_SECRET"));
+                    && hasText(env.getProperty("CLOUDINARY_API_SECRET")));
         }
 
         private boolean hasText(String value) {

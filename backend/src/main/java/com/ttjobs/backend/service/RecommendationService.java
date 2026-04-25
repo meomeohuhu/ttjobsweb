@@ -3,6 +3,7 @@ package com.ttjobs.backend.service;
 import com.ttjobs.backend.dto.AiPredictionDTO;
 import com.ttjobs.backend.dto.AiPredictionRequest;
 import com.ttjobs.backend.dto.JobDTO;
+import com.ttjobs.backend.entity.JobNeedPreference;
 import com.ttjobs.backend.entity.Job;
 import com.ttjobs.backend.entity.User;
 import com.ttjobs.backend.repository.JobRepository;
@@ -65,6 +66,8 @@ public class RecommendationService {
     @Autowired
     private AuthContextService authContextService;
     @Autowired
+    private JobNeedPreferenceService jobNeedPreferenceService;
+    @Autowired
     private JobRepository jobRepository;
     @Autowired
     private ObjectMapper objectMapper;
@@ -98,6 +101,51 @@ public class RecommendationService {
 
         List<AiPredictionDTO> predictions = fetchPredictions(cvText);
         return findJobsFromPredictions(predictions);
+    }
+
+    public List<JobDTO> recommendByJobNeeds() {
+        User currentUser = authContextService.requireCurrentUser();
+        if (currentUser.getRole() != User.Role.CANDIDATE) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only candidate can request recommendations");
+        }
+
+        JobNeedPreference preference = jobNeedPreferenceService.getOrCreate(currentUser.getId());
+        if (!jobNeedPreferenceService.hasConfiguredCriteria(preference)) {
+            return List.of();
+        }
+
+        Specification<Job> spec = Specification.where(JobSpecifications.activeJobs())
+                .and(JobSpecifications.statusEquals("open"));
+
+        if (preference.getDesiredTitle() != null && !preference.getDesiredTitle().isBlank()) {
+            spec = spec.and(JobSpecifications.keywordLike(preference.getDesiredTitle()));
+        }
+        if (preference.getDesiredLocation() != null && !preference.getDesiredLocation().isBlank()) {
+            spec = spec.and(JobSpecifications.locationLike(preference.getDesiredLocation()));
+        }
+        if (preference.getDesiredCategory() != null && !preference.getDesiredCategory().isBlank()) {
+            spec = spec.and(JobSpecifications.categoryIn(List.of(preference.getDesiredCategory())));
+        }
+        if (preference.getDesiredJobType() != null && !preference.getDesiredJobType().isBlank()) {
+            spec = spec.and(JobSpecifications.jobTypeEquals(preference.getDesiredJobType()));
+        }
+        if (preference.getDesiredExperienceLevel() != null && !preference.getDesiredExperienceLevel().isBlank()) {
+            spec = spec.and(JobSpecifications.experienceLevelEquals(preference.getDesiredExperienceLevel()));
+        }
+        if (preference.getMinSalary() != null) {
+            spec = spec.and(JobSpecifications.salaryMinGte(preference.getMinSalary()));
+        }
+        if (preference.getMaxSalary() != null) {
+            spec = spec.and(JobSpecifications.salaryMaxLte(preference.getMaxSalary()));
+        }
+        if (Boolean.TRUE.equals(preference.getRemoteOnly())) {
+            spec = spec.and(JobSpecifications.remoteFriendly());
+        }
+
+        return jobRepository.findAll(spec, PageRequest.of(0, MAX_JOBS))
+                .stream()
+                .map(this::toDto)
+                .collect(Collectors.toList());
     }
 
     private List<JobDTO> findJobsFromPredictions(List<AiPredictionDTO> predictions) {

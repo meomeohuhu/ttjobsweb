@@ -53,6 +53,20 @@ public class User {
     private Integer experienceYears;
     private String cvUrl;
     private String cvText;
+    private String cvRole;
+    @Column(columnDefinition = "TEXT")
+    private String cvObjective;
+    @Column(columnDefinition = "TEXT")
+    private String cvExperienceHighlights;
+
+    public enum PrimaryCvType {
+        BUILDER,
+        UPLOADED
+    }
+
+    @Enumerated(EnumType.STRING)
+    private PrimaryCvType primaryCvType;
+
     private String avatarUrl;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

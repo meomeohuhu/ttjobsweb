@@ -6,7 +6,10 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import java.util.ArrayList;
+import java.util.List;
 import java.time.LocalDateTime;
 import lombok.Data;
 
@@ -30,4 +33,7 @@ public class Message {
     private String content;
     private String type;
     private LocalDateTime createdAt;
+
+    @OneToMany(mappedBy = "message", cascade = jakarta.persistence.CascadeType.ALL, orphanRemoval = true)
+    private List<MessageAttachment> attachments = new ArrayList<>();
 }

@@ -50,6 +50,9 @@ public class CompanyService {
     private CompanyAuthorizationService companyAuthorizationService;
 
     @Autowired
+    private RecruiterActivityLogService recruiterActivityLogService;
+
+    @Autowired
     private JobRepository jobRepository;
 
     public List<CompanyDTO> getAllCompanies() {
@@ -122,6 +125,7 @@ public class CompanyService {
             companyMemberRepository.save(member);
         }
 
+        recruiterActivityLogService.logCompanyCreated(currentUser, savedCompany);
         return convertToDTO(savedCompany);
     }
 
@@ -152,7 +156,9 @@ public class CompanyService {
             company.setLogoUrl(companyDetails.getLogoUrl());
         }
 
-        return convertToDTO(companyRepository.save(company));
+        Company saved = companyRepository.save(company);
+        recruiterActivityLogService.logCompanyUpdated(currentUser, saved);
+        return convertToDTO(saved);
     }
 
     public void deleteCompany(Long id) {
@@ -163,7 +169,8 @@ public class CompanyService {
 
         requireCompanyManagePermission(currentUser, company);
         company.setDeletedAt(LocalDateTime.now());
-        companyRepository.save(company);
+        Company saved = companyRepository.save(company);
+        recruiterActivityLogService.logCompanyDeleted(currentUser, saved);
     }
 
     public List<CompanyMemberDTO> getCompanyMembers(Long companyId) {
@@ -202,8 +209,9 @@ public class CompanyService {
         member.setCompany(company);
         member.setUser(targetUser);
         member.setMemberRole(memberRole);
-
-        return convertToMemberDTO(companyMemberRepository.save(member));
+        CompanyMember saved = companyMemberRepository.save(member);
+        recruiterActivityLogService.logCompanyMemberAdded(currentUser, company, targetUser, saved.getMemberRole().name());
+        return convertToMemberDTO(saved);
     }
 
     public CompanyMemberDTO updateCompanyMember(Long companyId, Long memberId, CompanyMemberUpsertRequest request) {
@@ -218,7 +226,9 @@ public class CompanyService {
 
         CompanyMember.MemberRole nextRole = parseMemberRole(request.getMemberRole());
         member.setMemberRole(nextRole);
-        return convertToMemberDTO(companyMemberRepository.save(member));
+        CompanyMember saved = companyMemberRepository.save(member);
+        recruiterActivityLogService.logCompanyMemberUpdated(currentUser, company, saved.getUser(), saved.getMemberRole().name());
+        return convertToMemberDTO(saved);
     }
 
     public void removeCompanyMember(Long companyId, Long memberId) {
@@ -242,7 +252,9 @@ public class CompanyService {
             }
         }
 
+        User removedUser = member.getUser();
         companyMemberRepository.delete(member);
+        recruiterActivityLogService.logCompanyMemberRemoved(currentUser, company, removedUser);
     }
 
     private void requireRecruiterOrAdmin(User user) {

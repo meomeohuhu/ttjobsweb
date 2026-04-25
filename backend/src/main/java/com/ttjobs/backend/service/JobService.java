@@ -20,6 +20,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -43,6 +44,9 @@ public class JobService {
 
     @Autowired
     private AuthContextService authContextService;
+
+    @Autowired
+    private RecruiterActivityLogService recruiterActivityLogService;
 
     public List<JobDTO> getAllJobs() {
         // Default candidate-facing list only shows open jobs.
@@ -84,8 +88,9 @@ public class JobService {
         job.setPostedDate(LocalDateTime.now());
         job.setStatus(normalizeJobStatus(job.getStatus(), DRAFT));
         normalizeCompensation(job);
-
-        return convertToDTO(jobRepository.save(job));
+        Job saved = jobRepository.save(job);
+        recruiterActivityLogService.logJobCreated(currentUser, saved);
+        return convertToDTO(saved);
     }
 
     public JobDTO updateJob(Long id, Job jobDetails) {
@@ -94,51 +99,77 @@ public class JobService {
         Job job = jobRepository.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
 
+        String previousStatus = job.getStatus();
+        boolean changed = false;
+
         requireCompanyOwnership(currentUser, job.getCompany());
 
         if (jobDetails.getTitle() != null) {
             job.setTitle(jobDetails.getTitle());
+            changed = true;
         }
         if (jobDetails.getDescription() != null) {
             job.setDescription(jobDetails.getDescription());
+            changed = true;
         }
         if (jobDetails.getLocation() != null) {
             job.setLocation(jobDetails.getLocation());
+            changed = true;
         }
         if (jobDetails.getSalary() != null) {
             job.setSalary(jobDetails.getSalary());
+            changed = true;
         }
         if (jobDetails.getSalaryMin() != null) {
             job.setSalaryMin(jobDetails.getSalaryMin());
+            changed = true;
         }
         if (jobDetails.getSalaryMax() != null) {
             job.setSalaryMax(jobDetails.getSalaryMax());
+            changed = true;
         }
         if (jobDetails.getCurrency() != null && !jobDetails.getCurrency().isBlank()) {
             job.setCurrency(jobDetails.getCurrency().trim().toUpperCase());
+            changed = true;
         }
         if (jobDetails.getJobType() != null) {
             job.setJobType(jobDetails.getJobType());
+            changed = true;
         }
         if (jobDetails.getExperienceLevel() != null) {
             job.setExperienceLevel(jobDetails.getExperienceLevel());
+            changed = true;
         }
         // Update job category if provided.
         if (jobDetails.getCategory() != null) {
             job.setCategory(jobDetails.getCategory());
+            changed = true;
         }
         if (jobDetails.getApplicationDeadline() != null) {
             job.setApplicationDeadline(jobDetails.getApplicationDeadline());
+            changed = true;
         }
 
         if (jobDetails.getStatus() != null && !jobDetails.getStatus().isBlank()) {
             String nextStatus = normalizeJobStatus(jobDetails.getStatus(), null);
             validateJobTransition(job.getStatus(), nextStatus);
             job.setStatus(nextStatus);
+            changed = true;
         }
         normalizeCompensation(job);
-
-        return convertToDTO(jobRepository.save(job));
+        Job saved = jobRepository.save(job);
+        if (!Objects.equals(previousStatus, saved.getStatus())) {
+            recruiterActivityLogService.logJobStatusChanged(
+                    currentUser,
+                    saved,
+                    resolveJobStatusAction(saved.getStatus()),
+                    previousStatus,
+                    saved.getStatus()
+            );
+        } else if (changed) {
+            recruiterActivityLogService.logJobUpdated(currentUser, saved);
+        }
+        return convertToDTO(saved);
     }
 
     public void deleteJob(Long id) {
@@ -149,10 +180,12 @@ public class JobService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
 
         requireCompanyOwnership(currentUser, job.getCompany());
+        String previousStatus = job.getStatus();
         validateJobTransition(job.getStatus(), ARCHIVED);
         job.setStatus(ARCHIVED);
         job.setDeletedAt(LocalDateTime.now());
-        jobRepository.save(job);
+        Job saved = jobRepository.save(job);
+        recruiterActivityLogService.logJobStatusChanged(currentUser, saved, "JOB_ARCHIVED", previousStatus, ARCHIVED);
     }
 
     public List<JobDTO> searchJobs(String title, String location, String companyName,
@@ -327,5 +360,17 @@ public class JobService {
         JobDTO dto = convertToDTO(projection.getJob());
         dto.setSavedCount(projection.getSavedCount());
         return dto;
+    }
+
+    private String resolveJobStatusAction(String status) {
+        if (status == null) {
+            return "JOB_UPDATED";
+        }
+        return switch (status.toLowerCase()) {
+            case OPEN -> "JOB_OPENED";
+            case CLOSED -> "JOB_CLOSED";
+            case ARCHIVED -> "JOB_ARCHIVED";
+            default -> "JOB_UPDATED";
+        };
     }
 }

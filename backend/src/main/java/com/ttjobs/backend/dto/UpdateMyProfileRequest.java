@@ -21,5 +21,9 @@ public class UpdateMyProfileRequest {
     @Min(value = 0, message = "experienceYears must be >= 0")
     private Integer experienceYears;
 
+    private String cvRole;
+    private String cvObjective;
+    private String cvExperienceHighlights;
+
     private List<@Size(max = 64, message = "skill name must be at most 64 characters") String> skills;
 }
