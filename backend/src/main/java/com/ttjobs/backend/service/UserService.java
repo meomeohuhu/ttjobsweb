@@ -19,6 +19,9 @@ public class UserService {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private RecruiterActivityLogService recruiterActivityLogService;
+
     public User register(RegisterRequest request) {
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
             throw new RuntimeException("Email already exists");
@@ -47,6 +50,7 @@ public class UserService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
         }
 
+        recruiterActivityLogService.logLoginSuccess(user);
         return jwtService.generateToken(user.getEmail(), user.getRole().name());
     }
 }

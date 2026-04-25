@@ -40,9 +40,16 @@ public class SecurityConfig {
                 // Public job listings and job detail.
                 .requestMatchers(HttpMethod.GET, "/api/jobs/**").permitAll()
                 // Public company pages.
-                .requestMatchers(HttpMethod.GET, "/api/companies/**").permitAll()
+                .requestMatchers(HttpMethod.GET,
+                        "/api/companies",
+                        "/api/companies/top-saved-jobs",
+                        "/api/companies/*",
+                        "/api/companies/*/jobs",
+                        "/api/companies/*/public-page").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/career-guides/**").permitAll()
                 // Authenticated company follow actions.
                 .requestMatchers("/api/company-follows/**").authenticated()
+                .requestMatchers("/api/job-needs/**").authenticated()
                 // Recruiter dashboard and future recruiter workspace routes.
                 .requestMatchers("/api/recruiter/**").authenticated()
                 // Only users with ROLE_ADMIN can access admin routes.

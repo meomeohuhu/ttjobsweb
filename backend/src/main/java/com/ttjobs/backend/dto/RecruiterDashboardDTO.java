@@ -14,4 +14,5 @@ public class RecruiterDashboardDTO {
     private List<RecruiterDashboardJobDTO> expiringSoonJobs;
     private List<JobApplicationDTO> recentApplications;
     private List<RecruiterDashboardCompanyDTO> managedCompanies;
+    private List<RecruiterActivityLogDTO> recentActivities;
 }

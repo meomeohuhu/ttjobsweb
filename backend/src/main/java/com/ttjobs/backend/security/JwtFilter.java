@@ -81,9 +81,6 @@ public class JwtFilter extends OncePerRequestFilter {
         if ("GET".equalsIgnoreCase(method) && path.startsWith("/api/jobs")) {
             return true;
         }
-        if ("GET".equalsIgnoreCase(method) && path.startsWith("/api/companies")) {
-            return true;
-        }
         return false;
     }
 }

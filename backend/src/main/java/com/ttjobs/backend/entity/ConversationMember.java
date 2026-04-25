@@ -28,4 +28,5 @@ public class ConversationMember {
     private User user;
 
     private LocalDateTime createdAt;
+    private LocalDateTime lastReadAt;
 }

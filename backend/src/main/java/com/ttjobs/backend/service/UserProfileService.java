@@ -56,6 +56,15 @@ public class UserProfileService {
         if (request.getSkills() != null) {
             currentUser.setSkills(resolveSkills(request.getSkills()));
         }
+        if (request.getCvRole() != null) {
+            currentUser.setCvRole(request.getCvRole().trim());
+        }
+        if (request.getCvObjective() != null) {
+            currentUser.setCvObjective(request.getCvObjective().trim());
+        }
+        if (request.getCvExperienceHighlights() != null) {
+            currentUser.setCvExperienceHighlights(request.getCvExperienceHighlights().trim());
+        }
 
         return toDto(userRepository.save(currentUser));
     }
@@ -137,6 +146,9 @@ public class UserProfileService {
         dto.setAddress(user.getAddress());
         dto.setExperienceYears(user.getExperienceYears());
         dto.setCvUrl(user.getCvUrl());
+        dto.setCvRole(user.getCvRole());
+        dto.setCvObjective(user.getCvObjective());
+        dto.setCvExperienceHighlights(user.getCvExperienceHighlights());
         dto.setAvatarUrl(user.getAvatarUrl());
         if (user.getSkills() != null) {
             dto.setSkills(user.getSkills().stream().map(Skill::getName).toList());

@@ -3,8 +3,6 @@ package com.ttjobs.backend.config;
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
 
-import lombok.val;
-
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Bean;
@@ -17,22 +15,22 @@ import org.springframework.context.annotation.ConditionContext;
 @Configuration
 public class CloudinaryConfig {
 
-    @Value("${CLOUDINARY_CLOUD_NAME:}")
+    @Value("${cloudinary.cloud-name:${CLOUDINARY_CLOUD_NAME:}}")
     private String cloudName;
 
-    @Value("${CLOUDINARY_API_KEY:}")
+    @Value("${cloudinary.api-key:${CLOUDINARY_API_KEY:}}")
     private String apiKey;
 
-    @Value("${CLOUDINARY_API_SECRET:}")
+    @Value("${cloudinary.api-secret:${CLOUDINARY_API_SECRET:}}")
     private String apiSecret;
  
     @Bean
     @Conditional(CloudinaryEnvConfiguredCondition.class)
     public Cloudinary cloudinary() {
         return new Cloudinary(ObjectUtils.asMap(
-                "cloud_name", "dgny2gq8p",
-                "api_key", "353722888398141",
-                "api_secret", "N_G6ilvhWyknNmwmHTVEaUWSPrs",
+                "cloud_name", cloudName,
+                "api_key", apiKey,
+                "api_secret", apiSecret,
                 "secure", true
         ));
     }
@@ -41,9 +39,12 @@ public class CloudinaryConfig {
         @Override
         public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
             Environment env = context.getEnvironment();
-            return hasText(env.getProperty("CLOUDINARY_CLOUD_NAME"))
+            return (hasText(env.getProperty("cloudinary.cloud-name"))
+                    && hasText(env.getProperty("cloudinary.api-key"))
+                    && hasText(env.getProperty("cloudinary.api-secret")))
+                    || (hasText(env.getProperty("CLOUDINARY_CLOUD_NAME"))
                     && hasText(env.getProperty("CLOUDINARY_API_KEY"))
-                    && hasText(env.getProperty("CLOUDINARY_API_SECRET"));
+                    && hasText(env.getProperty("CLOUDINARY_API_SECRET")));
         }
 
         private boolean hasText(String value) {

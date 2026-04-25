@@ -3,6 +3,7 @@ package com.ttjobs.backend.controller;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -53,5 +54,15 @@ class RecommendationControllerTest {
                 .andExpect(status().isOk());
 
         verify(recommendationService).recommendByCvText("java");
+    }
+
+    @Test
+    void recommendByJobNeeds_shouldReturnOk() throws Exception {
+        when(recommendationService.recommendByJobNeeds()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/recommendations/job-needs"))
+                .andExpect(status().isOk());
+
+        verify(recommendationService).recommendByJobNeeds();
     }
 }
