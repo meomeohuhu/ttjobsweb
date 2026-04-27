@@ -51,6 +51,8 @@ public class CompanyService {
 
     @Autowired
     private RecruiterActivityLogService recruiterActivityLogService;
+    @Autowired
+    private ImageUploadService imageUploadService;
 
     @Autowired
     private JobRepository jobRepository;
@@ -125,7 +127,9 @@ public class CompanyService {
             companyMemberRepository.save(member);
         }
 
-        recruiterActivityLogService.logCompanyCreated(currentUser, savedCompany);
+        if (recruiterActivityLogService != null) {
+            recruiterActivityLogService.logCompanyCreated(currentUser, savedCompany);
+        }
         return convertToDTO(savedCompany);
     }
 
@@ -157,7 +161,9 @@ public class CompanyService {
         }
 
         Company saved = companyRepository.save(company);
-        recruiterActivityLogService.logCompanyUpdated(currentUser, saved);
+        if (recruiterActivityLogService != null) {
+            recruiterActivityLogService.logCompanyUpdated(currentUser, saved);
+        }
         return convertToDTO(saved);
     }
 
@@ -170,7 +176,24 @@ public class CompanyService {
         requireCompanyManagePermission(currentUser, company);
         company.setDeletedAt(LocalDateTime.now());
         Company saved = companyRepository.save(company);
-        recruiterActivityLogService.logCompanyDeleted(currentUser, saved);
+        if (recruiterActivityLogService != null) {
+            recruiterActivityLogService.logCompanyDeleted(currentUser, saved);
+        }
+    }
+
+    public CompanyDTO uploadCompanyLogo(Long id, org.springframework.web.multipart.MultipartFile file) {
+        User currentUser = authContextService.requireCurrentUser();
+        Company company = companyRepository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Company not found"));
+
+        requireCompanyManagePermission(currentUser, company);
+        String logoUrl = imageUploadService.uploadImage(file, "ttjobs/companies", "company-" + company.getId());
+        company.setLogoUrl(logoUrl);
+        Company saved = companyRepository.save(company);
+        if (recruiterActivityLogService != null) {
+            recruiterActivityLogService.logCompanyUpdated(currentUser, saved);
+        }
+        return convertToDTO(saved);
     }
 
     public List<CompanyMemberDTO> getCompanyMembers(Long companyId) {
@@ -210,7 +233,9 @@ public class CompanyService {
         member.setUser(targetUser);
         member.setMemberRole(memberRole);
         CompanyMember saved = companyMemberRepository.save(member);
-        recruiterActivityLogService.logCompanyMemberAdded(currentUser, company, targetUser, saved.getMemberRole().name());
+        if (recruiterActivityLogService != null) {
+            recruiterActivityLogService.logCompanyMemberAdded(currentUser, company, targetUser, saved.getMemberRole().name());
+        }
         return convertToMemberDTO(saved);
     }
 
@@ -227,7 +252,9 @@ public class CompanyService {
         CompanyMember.MemberRole nextRole = parseMemberRole(request.getMemberRole());
         member.setMemberRole(nextRole);
         CompanyMember saved = companyMemberRepository.save(member);
-        recruiterActivityLogService.logCompanyMemberUpdated(currentUser, company, saved.getUser(), saved.getMemberRole().name());
+        if (recruiterActivityLogService != null) {
+            recruiterActivityLogService.logCompanyMemberUpdated(currentUser, company, saved.getUser(), saved.getMemberRole().name());
+        }
         return convertToMemberDTO(saved);
     }
 
@@ -254,7 +281,9 @@ public class CompanyService {
 
         User removedUser = member.getUser();
         companyMemberRepository.delete(member);
-        recruiterActivityLogService.logCompanyMemberRemoved(currentUser, company, removedUser);
+        if (recruiterActivityLogService != null) {
+            recruiterActivityLogService.logCompanyMemberRemoved(currentUser, company, removedUser);
+        }
     }
 
     private void requireRecruiterOrAdmin(User user) {

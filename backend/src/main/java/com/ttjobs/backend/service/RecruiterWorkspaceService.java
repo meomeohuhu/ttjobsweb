@@ -1,23 +1,34 @@
 package com.ttjobs.backend.service;
 
 import com.ttjobs.backend.dto.ApplicationTimelineDTO;
+import com.ttjobs.backend.dto.CandidateSearchDTO;
+import com.ttjobs.backend.dto.InterviewScheduleDTO;
+import com.ttjobs.backend.dto.InterviewScheduleRequest;
 import com.ttjobs.backend.dto.RecruiterApplicationDTO;
 import com.ttjobs.backend.dto.RecruiterApplicationDetailDTO;
 import com.ttjobs.backend.dto.RecruiterCompanyDTO;
 import com.ttjobs.backend.dto.RecruiterJobDTO;
+import com.ttjobs.backend.dto.RecruiterReportDTO;
+import com.ttjobs.backend.dto.RecruitmentCampaignDTO;
+import com.ttjobs.backend.dto.RecruitmentCampaignRequest;
 import com.ttjobs.backend.entity.Company;
 import com.ttjobs.backend.entity.CompanyMember;
+import com.ttjobs.backend.entity.InterviewSchedule;
 import com.ttjobs.backend.entity.Job;
 import com.ttjobs.backend.entity.JobApplication;
 import com.ttjobs.backend.entity.JobApplicationStatusAudit;
+import com.ttjobs.backend.entity.RecruitmentCampaign;
 import com.ttjobs.backend.entity.User;
 import com.ttjobs.backend.repository.CompanyFollowRepository;
 import com.ttjobs.backend.repository.CompanyMemberRepository;
 import com.ttjobs.backend.repository.CompanyRepository;
+import com.ttjobs.backend.repository.InterviewScheduleRepository;
 import com.ttjobs.backend.repository.JobApplicationRepository;
 import com.ttjobs.backend.repository.JobApplicationStatusAuditRepository;
 import com.ttjobs.backend.repository.JobRepository;
+import com.ttjobs.backend.repository.RecruitmentCampaignRepository;
 import com.ttjobs.backend.repository.SavedJobRepository;
+import com.ttjobs.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -55,6 +66,12 @@ public class RecruiterWorkspaceService {
     private JobApplicationStatusAuditRepository statusAuditRepository;
     @Autowired
     private SavedJobRepository savedJobRepository;
+    @Autowired
+    private InterviewScheduleRepository interviewScheduleRepository;
+    @Autowired
+    private RecruitmentCampaignRepository campaignRepository;
+    @Autowired
+    private UserRepository userRepository;
 
     public List<RecruiterCompanyDTO> getManagedCompanies() {
         User currentUser = requireRecruiterOrAdmin();
@@ -113,6 +130,155 @@ public class RecruiterWorkspaceService {
         return toApplicationDetailDto(application);
     }
 
+    public List<RecruiterApplicationDTO> bulkUpdateApplicationStatus(List<Long> applicationIds, String status) {
+        User currentUser = requireRecruiterOrAdmin();
+        if (applicationIds == null || applicationIds.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "applicationIds is required");
+        }
+        if (isBlank(status)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "status is required");
+        }
+        return applicationIds.stream()
+                .map(id -> updateApplicationStatusForRecruiter(currentUser, id, status))
+                .map(this::toApplicationDto)
+                .toList();
+    }
+
+    public List<CandidateSearchDTO> searchCandidates(String keyword, Integer minExperience, String status) {
+        User currentUser = requireRecruiterOrAdmin();
+        String value = isBlank(keyword) ? "" : keyword.toLowerCase(Locale.ROOT);
+        return loadManagedApplications(currentUser).stream()
+                .filter(application -> isBlank(status) || status.equalsIgnoreCase(application.getStatus()))
+                .filter(application -> application.getUser() != null)
+                .filter(application -> minExperience == null
+                        || (application.getUser().getExperienceYears() != null
+                        && application.getUser().getExperienceYears() >= minExperience))
+                .filter(application -> value.isBlank()
+                        || contains(application.getUser().getName(), value)
+                        || contains(application.getUser().getEmail(), value)
+                        || contains(application.getJob() == null ? null : application.getJob().getTitle(), value))
+                .collect(Collectors.groupingBy(application -> application.getUser().getId()))
+                .values()
+                .stream()
+                .map(items -> toCandidateDto(items.stream()
+                        .max(Comparator.comparing(JobApplication::getApplicationDate, Comparator.nullsLast(Comparator.naturalOrder())))
+                        .orElse(items.get(0)), items.size()))
+                .sorted(Comparator.comparing(CandidateSearchDTO::getCandidateName, Comparator.nullsLast(String::compareToIgnoreCase)))
+                .toList();
+    }
+
+    public RecruiterReportDTO getReport(Integer days) {
+        User currentUser = requireRecruiterOrAdmin();
+        int safeDays = days == null ? 30 : Math.max(1, Math.min(days, 365));
+        LocalDateTime from = LocalDateTime.now().minusDays(safeDays);
+        List<Job> jobs = loadManagedJobs(currentUser);
+        List<JobApplication> applications = loadManagedApplications(currentUser);
+        List<Long> jobIds = jobs.stream().map(Job::getId).filter(Objects::nonNull).toList();
+
+        RecruiterReportDTO dto = new RecruiterReportDTO();
+        dto.setOpenJobs(jobs.stream().filter(job -> "open".equalsIgnoreCase(job.getStatus())).count());
+        dto.setTotalApplications((long) applications.size());
+        dto.setNewApplications(applications.stream()
+                .filter(application -> application.getApplicationDate() != null && !application.getApplicationDate().isBefore(from))
+                .count());
+        dto.setInterviewsScheduled(jobIds.isEmpty() ? 0L
+                : interviewScheduleRepository.countByApplicationJobIdInAndScheduledAtBetween(jobIds, from, LocalDateTime.now().plusYears(1)));
+        dto.setHiredApplications(applications.stream().filter(application -> "hired".equalsIgnoreCase(application.getStatus())).count());
+        dto.setRejectedApplications(applications.stream().filter(application -> "rejected".equalsIgnoreCase(application.getStatus())).count());
+        dto.setApplicationsByStatus(applications.stream()
+                .collect(Collectors.groupingBy(application -> application.getStatus() == null ? "submitted" : application.getStatus(), Collectors.counting())));
+        dto.setApplicationsByJob(applications.stream()
+                .filter(application -> application.getJob() != null)
+                .collect(Collectors.groupingBy(application -> application.getJob().getTitle(), Collectors.counting())));
+        return dto;
+    }
+
+    public List<InterviewScheduleDTO> getManagedInterviews() {
+        User currentUser = requireRecruiterOrAdmin();
+        List<Long> jobIds = loadManagedJobs(currentUser).stream().map(Job::getId).filter(Objects::nonNull).toList();
+        if (jobIds.isEmpty()) {
+            return List.of();
+        }
+        return interviewScheduleRepository.findByApplicationJobIdInOrderByScheduledAtAsc(jobIds)
+                .stream()
+                .map(this::toInterviewDto)
+                .toList();
+    }
+
+    public InterviewScheduleDTO createInterview(InterviewScheduleRequest request) {
+        User currentUser = requireRecruiterOrAdmin();
+        if (request == null || request.getApplicationId() == null || request.getScheduledAt() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "applicationId and scheduledAt are required");
+        }
+        JobApplication application = jobApplicationRepository.findByIdWithDetails(request.getApplicationId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Application not found"));
+        requireApplicationAccess(currentUser, application);
+
+        InterviewSchedule interview = new InterviewSchedule();
+        interview.setApplication(application);
+        interview.setRecruiter(currentUser);
+        interview.setCandidate(application.getUser());
+        interview.setScheduledAt(request.getScheduledAt());
+        interview.setDurationMinutes(request.getDurationMinutes());
+        interview.setLocation(request.getLocation());
+        interview.setMeetingLink(request.getMeetingLink());
+        interview.setNote(request.getNote());
+        interview.setStatus(isBlank(request.getStatus()) ? "pending" : request.getStatus());
+        return toInterviewDto(interviewScheduleRepository.save(interview));
+    }
+
+    public InterviewScheduleDTO updateInterviewStatus(Long interviewId, String status) {
+        User currentUser = requireRecruiterOrAdmin();
+        if (isBlank(status)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "status is required");
+        }
+        InterviewSchedule interview = interviewScheduleRepository.findById(interviewId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Interview not found"));
+        requireApplicationAccess(currentUser, interview.getApplication());
+        interview.setStatus(status);
+        return toInterviewDto(interviewScheduleRepository.save(interview));
+    }
+
+    public List<RecruitmentCampaignDTO> getCampaigns() {
+        User currentUser = requireRecruiterOrAdmin();
+        List<Long> companyIds = loadManagedCompanies(currentUser).stream().map(Company::getId).toList();
+        if (companyIds.isEmpty()) {
+            return List.of();
+        }
+        return campaignRepository.findByCompanyIdInOrderByCreatedAtDesc(companyIds).stream()
+                .map(this::toCampaignDto)
+                .toList();
+    }
+
+    public RecruitmentCampaignDTO saveCampaign(Long campaignId, RecruitmentCampaignRequest request) {
+        User currentUser = requireRecruiterOrAdmin();
+        if (request == null || request.getCompanyId() == null || isBlank(request.getName())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "companyId and name are required");
+        }
+        Company company = companyRepository.findByIdAndDeletedAtIsNull(request.getCompanyId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Company not found"));
+        if (!authContextService.isAdmin(currentUser) && !companyAuthorizationService.canManageCompany(currentUser, company)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You cannot manage this company");
+        }
+
+        RecruitmentCampaign campaign = campaignId == null
+                ? new RecruitmentCampaign()
+                : campaignRepository.findById(campaignId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Campaign not found"));
+        campaign.setCompany(company);
+        if (campaign.getCreatedBy() == null) {
+            campaign.setCreatedBy(currentUser);
+        }
+        campaign.setName(request.getName());
+        campaign.setDescription(request.getDescription());
+        campaign.setStatus(isBlank(request.getStatus()) ? "active" : request.getStatus());
+        campaign.setTargetHires(request.getTargetHires());
+        campaign.setStartsAt(request.getStartsAt());
+        campaign.setEndsAt(request.getEndsAt());
+        campaign.setJobs(loadCampaignJobs(currentUser, request.getJobIds()));
+        return toCampaignDto(campaignRepository.save(campaign));
+    }
+
     private User requireRecruiterOrAdmin() {
         User currentUser = authContextService.requireCurrentUser();
         if (currentUser.getRole() != User.Role.RECRUITER && !authContextService.isAdmin(currentUser)) {
@@ -166,6 +332,26 @@ public class RecruiterWorkspaceService {
                 || !companyAuthorizationService.canManageCompany(currentUser, application.getJob().getCompany())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You cannot access this application");
         }
+    }
+
+    private JobApplication updateApplicationStatusForRecruiter(User currentUser, Long applicationId, String status) {
+        JobApplication application = jobApplicationRepository.findById(applicationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Application not found"));
+        requireApplicationAccess(currentUser, application);
+        application.setStatus(status.trim().toLowerCase(Locale.ROOT));
+        return jobApplicationRepository.save(application);
+    }
+
+    private List<Job> loadCampaignJobs(User currentUser, List<Long> jobIds) {
+        if (jobIds == null || jobIds.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, Job> managed = loadManagedJobs(currentUser).stream()
+                .collect(Collectors.toMap(Job::getId, job -> job));
+        return jobIds.stream()
+                .map(managed::get)
+                .filter(Objects::nonNull)
+                .toList();
     }
 
     private RecruiterCompanyDTO toCompanyDto(Company company, User currentUser, List<Job> jobs) {
@@ -277,6 +463,71 @@ public class RecruiterWorkspaceService {
                 .stream()
                 .map(this::toTimelineDto)
                 .toList());
+        return dto;
+    }
+
+    private CandidateSearchDTO toCandidateDto(JobApplication application, int applicationCount) {
+        CandidateSearchDTO dto = new CandidateSearchDTO();
+        User candidate = application.getUser();
+        dto.setCandidateId(candidate.getId());
+        dto.setCandidateName(candidate.getName());
+        dto.setCandidateEmail(candidate.getEmail());
+        dto.setCandidatePhone(candidate.getPhone());
+        dto.setAddress(candidate.getAddress());
+        dto.setExperienceYears(candidate.getExperienceYears());
+        dto.setApplicationCount((long) applicationCount);
+        dto.setLatestJobTitle(application.getJob() == null ? null : application.getJob().getTitle());
+        dto.setLatestStatus(application.getStatus());
+        dto.setHasCv(hasCv(application));
+        return dto;
+    }
+
+    private InterviewScheduleDTO toInterviewDto(InterviewSchedule interview) {
+        InterviewScheduleDTO dto = new InterviewScheduleDTO();
+        dto.setId(interview.getId());
+        dto.setScheduledAt(interview.getScheduledAt());
+        dto.setDurationMinutes(interview.getDurationMinutes());
+        dto.setLocation(interview.getLocation());
+        dto.setMeetingLink(interview.getMeetingLink());
+        dto.setNote(interview.getNote());
+        dto.setStatus(interview.getStatus());
+        dto.setCreatedAt(interview.getCreatedAt());
+        JobApplication application = interview.getApplication();
+        if (application != null) {
+            dto.setApplicationId(application.getId());
+            if (application.getUser() != null) {
+                dto.setCandidateId(application.getUser().getId());
+                dto.setCandidateName(application.getUser().getName());
+            }
+            if (application.getJob() != null) {
+                dto.setJobId(application.getJob().getId());
+                dto.setJobTitle(application.getJob().getTitle());
+                if (application.getJob().getCompany() != null) {
+                    dto.setCompanyId(application.getJob().getCompany().getId());
+                    dto.setCompanyName(application.getJob().getCompany().getName());
+                }
+            }
+        }
+        return dto;
+    }
+
+    private RecruitmentCampaignDTO toCampaignDto(RecruitmentCampaign campaign) {
+        RecruitmentCampaignDTO dto = new RecruitmentCampaignDTO();
+        dto.setId(campaign.getId());
+        if (campaign.getCompany() != null) {
+            dto.setCompanyId(campaign.getCompany().getId());
+            dto.setCompanyName(campaign.getCompany().getName());
+        }
+        dto.setName(campaign.getName());
+        dto.setDescription(campaign.getDescription());
+        dto.setStatus(campaign.getStatus());
+        dto.setTargetHires(campaign.getTargetHires());
+        dto.setStartsAt(campaign.getStartsAt());
+        dto.setEndsAt(campaign.getEndsAt());
+        dto.setJobCount((long) (campaign.getJobs() == null ? 0 : campaign.getJobs().size()));
+        dto.setApplicationCount((long) (campaign.getApplications() == null ? 0 : campaign.getApplications().size()));
+        dto.setJobIds(campaign.getJobs() == null ? List.of() : campaign.getJobs().stream().map(Job::getId).toList());
+        dto.setCreatedAt(campaign.getCreatedAt());
         return dto;
     }
 

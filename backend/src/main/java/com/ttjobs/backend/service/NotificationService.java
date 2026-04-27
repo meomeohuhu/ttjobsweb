@@ -26,6 +26,10 @@ public class NotificationService {
     private AuthContextService authContextService;
 
     public void createNotification(User targetUser, String title, String content, String type) {
+        createNotification(targetUser, title, content, type, null);
+    }
+
+    public void createNotification(User targetUser, String title, String content, String type, String targetUrl) {
         if (targetUser == null) {
             return;
         }
@@ -34,6 +38,7 @@ public class NotificationService {
         notification.setTitle(title);
         notification.setContent(content);
         notification.setType(type);
+        notification.setTargetUrl(targetUrl);
         notification.setIsRead(false);
         notification.setCreatedAt(LocalDateTime.now());
         notificationRepository.save(notification);
@@ -84,6 +89,7 @@ public class NotificationService {
         dto.setTitle(notification.getTitle());
         dto.setContent(notification.getContent());
         dto.setType(notification.getType());
+        dto.setTargetUrl(notification.getTargetUrl());
         dto.setIsRead(notification.getIsRead());
         dto.setCreatedAt(notification.getCreatedAt());
         return dto;

@@ -10,6 +10,8 @@ import com.ttjobs.backend.dto.JobDTO;
 import com.ttjobs.backend.service.JobService;
 import com.ttjobs.backend.exception.ResourceNotFoundException;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -46,6 +48,11 @@ public class JobController {
     @PutMapping("/{id}")
     public JobDTO updateJob(@PathVariable Long id, @Valid @RequestBody Job job) {
         return jobService.updateJob(id, job);
+    }
+
+    @PostMapping(value = "/{id}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public JobDTO uploadJobImage(@PathVariable Long id, @RequestPart("file") MultipartFile file) {
+        return jobService.uploadJobImage(id, file);
     }
 
     // Keep old DELETE endpoint contract, but service performs soft close.

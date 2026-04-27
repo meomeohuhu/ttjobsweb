@@ -47,6 +47,8 @@ public class JobService {
 
     @Autowired
     private RecruiterActivityLogService recruiterActivityLogService;
+    @Autowired
+    private ImageUploadService imageUploadService;
 
     public List<JobDTO> getAllJobs() {
         // Default candidate-facing list only shows open jobs.
@@ -145,6 +147,10 @@ public class JobService {
             job.setCategory(jobDetails.getCategory());
             changed = true;
         }
+        if (jobDetails.getImageUrl() != null) {
+            job.setImageUrl(jobDetails.getImageUrl());
+            changed = true;
+        }
         if (jobDetails.getApplicationDeadline() != null) {
             job.setApplicationDeadline(jobDetails.getApplicationDeadline());
             changed = true;
@@ -186,6 +192,19 @@ public class JobService {
         job.setDeletedAt(LocalDateTime.now());
         Job saved = jobRepository.save(job);
         recruiterActivityLogService.logJobStatusChanged(currentUser, saved, "JOB_ARCHIVED", previousStatus, ARCHIVED);
+    }
+
+    public JobDTO uploadJobImage(Long id, org.springframework.web.multipart.MultipartFile file) {
+        User currentUser = authContextService.requireCurrentUser();
+        Job job = jobRepository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
+
+        requireCompanyOwnership(currentUser, job.getCompany());
+        String imageUrl = imageUploadService.uploadImage(file, "ttjobs/jobs", "job-" + job.getId());
+        job.setImageUrl(imageUrl);
+        Job saved = jobRepository.save(job);
+        recruiterActivityLogService.logJobUpdated(currentUser, saved);
+        return convertToDTO(saved);
     }
 
     public List<JobDTO> searchJobs(String title, String location, String companyName,
@@ -345,6 +364,7 @@ public class JobService {
         dto.setJobType(job.getJobType());
         dto.setExperienceLevel(job.getExperienceLevel());
         dto.setCategory(job.getCategory());
+        dto.setImageUrl(job.getImageUrl());
         dto.setStatus(job.getStatus());
         dto.setPostedDate(job.getPostedDate());
         dto.setApplicationDeadline(job.getApplicationDeadline());

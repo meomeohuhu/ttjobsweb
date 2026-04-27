@@ -9,42 +9,44 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import lombok.Data;
 
-import java.time.LocalDateTime;
-
 @Entity
-@Table(name = "notifications")
+@Table(name = "recruitment_events")
 @Data
-public class Notification {
+public class RecruitmentEvent {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name = "user_id")
-    private User user;
+    @JoinColumn(name = "company_id")
+    private Company company;
 
-    private String title;
-    private String content;
-    private String type;
-    @Column(name = "target_url")
-    private String targetUrl;
+    @ManyToOne
+    @JoinColumn(name = "job_id")
+    private Job job;
 
-    @Column(nullable = false)
-    private Boolean isRead;
+    @ManyToOne
+    @JoinColumn(name = "application_id")
+    private JobApplication application;
 
-    @Column(nullable = false)
+    @ManyToOne
+    @JoinColumn(name = "actor_id")
+    private User actor;
+
+    private String eventType;
     private LocalDateTime createdAt;
+
+    @Column(columnDefinition = "TEXT")
+    private String metadata;
 
     @PrePersist
     public void onCreate() {
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
-        }
-        if (isRead == null) {
-            isRead = false;
         }
     }
 }

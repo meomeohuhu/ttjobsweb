@@ -6,6 +6,7 @@ import com.ttjobs.backend.dto.MessageDTO;
 import com.ttjobs.backend.dto.SendMessageRequest;
 import com.ttjobs.backend.service.ConversationService;
 import com.ttjobs.backend.service.MessageService;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,5 +61,13 @@ public class ConversationController {
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size) {
         return messageService.getMessages(conversationId, page, size);
+    }
+
+    @GetMapping("/{conversationId}/attachments/{attachmentId}/download")
+    public void downloadAttachment(
+            @PathVariable Long conversationId,
+            @PathVariable Long attachmentId,
+            HttpServletResponse response) {
+        messageService.downloadAttachment(conversationId, attachmentId, response);
     }
 }

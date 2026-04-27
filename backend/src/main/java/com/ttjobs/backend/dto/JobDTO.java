@@ -17,6 +17,7 @@ public class JobDTO {
     private String jobType;
     private String experienceLevel;
     private String category;
+    private String imageUrl;
     private String status;
     private LocalDateTime postedDate;
     private LocalDateTime applicationDeadline;
