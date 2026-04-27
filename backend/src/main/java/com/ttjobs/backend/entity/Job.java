@@ -39,6 +39,7 @@ public class Job {
     private String jobType;
     private String experienceLevel; // ENTRY, MID, SENIOR, etc.
     private String category;
+    private String imageUrl;
     @Column(nullable = false)
     private String status;
     private LocalDateTime postedDate;

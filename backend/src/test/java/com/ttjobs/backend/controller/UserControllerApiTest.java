@@ -1,10 +1,13 @@
 package com.ttjobs.backend.controller;
 
+import com.ttjobs.backend.dto.CandidateDashboardDTO;
 import com.ttjobs.backend.dto.UserCvDTO;
 import com.ttjobs.backend.dto.UserAvatarDTO;
+import com.ttjobs.backend.service.CandidateDashboardService;
 import com.ttjobs.backend.service.JwtService;
 import com.ttjobs.backend.service.UserAvatarService;
 import com.ttjobs.backend.service.UserCvService;
+import com.ttjobs.backend.service.UserInterviewService;
 import com.ttjobs.backend.service.UserProfileService;
 import com.ttjobs.backend.dto.UserProfileDTO;
 import org.junit.jupiter.api.Test;
@@ -38,6 +41,10 @@ class UserControllerApiTest {
     private UserAvatarService userAvatarService;
     @MockBean
     private UserProfileService userProfileService;
+    @MockBean
+    private UserInterviewService userInterviewService;
+    @MockBean
+    private CandidateDashboardService candidateDashboardService;
     @MockBean
     private JwtService jwtService;
 
@@ -74,6 +81,30 @@ class UserControllerApiTest {
                         .content(body))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Thinh Updated"));
+    }
+
+    @Test
+    void getMyDashboard_shouldReturnCandidateDashboard() throws Exception {
+        CandidateDashboardDTO dto = new CandidateDashboardDTO();
+        dto.setAppliedCount(2);
+        dto.setSavedCount(3);
+        dto.setUpcomingInterviewCount(1);
+        dto.setUnreadMessageCount(4);
+        dto.setProfileCompletionPercent(75);
+        dto.setMissingProfileItems(java.util.List.of("CV", "Kỹ năng"));
+        dto.setRecentApplications(java.util.List.of());
+        dto.setRecommendedJobs(java.util.List.of());
+        dto.setUpcomingInterviews(java.util.List.of());
+        when(candidateDashboardService.getMyDashboard()).thenReturn(dto);
+
+        mockMvc.perform(get("/api/users/dashboard"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.appliedCount").value(2))
+                .andExpect(jsonPath("$.savedCount").value(3))
+                .andExpect(jsonPath("$.upcomingInterviewCount").value(1))
+                .andExpect(jsonPath("$.unreadMessageCount").value(4))
+                .andExpect(jsonPath("$.profileCompletionPercent").value(75))
+                .andExpect(jsonPath("$.missingProfileItems[0]").value("CV"));
     }
 
     @Test

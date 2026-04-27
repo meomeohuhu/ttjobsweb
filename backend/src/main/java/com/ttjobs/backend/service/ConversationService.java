@@ -119,7 +119,9 @@ public class ConversationService {
         dto.setId(conversation.getId());
         dto.setCreatedAt(conversation.getCreatedAt());
         dto.setMemberIds(memberIds);
-        Message lastMessage = messageRepository.findTopByConversationIdOrderByCreatedAtDesc(conversation.getId()).orElse(null);
+        Message lastMessage = messageRepository == null
+                ? null
+                : messageRepository.findTopByConversationIdOrderByCreatedAtDesc(conversation.getId()).orElse(null);
         if (lastMessage != null) {
             dto.setLastMessageAt(lastMessage.getCreatedAt());
             dto.setLastMessagePreview(buildPreview(lastMessage));
@@ -127,7 +129,7 @@ public class ConversationService {
         long unreadCount = 0L;
         long unreadByOthersCount = 0L;
         LocalDateTime myLastReadAt = myMembership == null ? null : myMembership.getLastReadAt();
-        if (myLastReadAt != null) {
+        if (myLastReadAt != null && messageRepository != null) {
             unreadCount = messageRepository.countByConversationIdAndSenderIdNotAndCreatedAtAfter(
                     conversation.getId(),
                     myMembership.getId().getUserId(),
@@ -141,7 +143,7 @@ public class ConversationService {
                 .orElse(null);
         if (otherMember != null && lastMessage != null && myMembership != null) {
             LocalDateTime otherLastReadAt = otherMember.getLastReadAt();
-            if (otherLastReadAt != null) {
+            if (otherLastReadAt != null && messageRepository != null) {
                 unreadByOthersCount = messageRepository.countByConversationIdAndSenderIdAndCreatedAtAfter(
                         conversation.getId(),
                         myMembership.getId().getUserId(),

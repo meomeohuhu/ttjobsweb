@@ -10,6 +10,7 @@ public class NotificationDTO {
     private String title;
     private String content;
     private String type;
+    private String targetUrl;
     private Boolean isRead;
     private LocalDateTime createdAt;
 }

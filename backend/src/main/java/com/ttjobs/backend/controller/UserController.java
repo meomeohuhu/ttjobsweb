@@ -1,15 +1,20 @@
 package com.ttjobs.backend.controller;
 
+import com.ttjobs.backend.dto.CandidateDashboardDTO;
+import com.ttjobs.backend.dto.InterviewScheduleDTO;
 import com.ttjobs.backend.dto.UserCvDTO;
 import com.ttjobs.backend.dto.UserCvTextDTO;
 import com.ttjobs.backend.dto.UserAvatarDTO;
 import com.ttjobs.backend.dto.UserProfileDTO;
 import com.ttjobs.backend.dto.ChangePasswordRequest;
 import com.ttjobs.backend.dto.UpdateMyProfileRequest;
+import com.ttjobs.backend.service.CandidateDashboardService;
 import com.ttjobs.backend.service.UserAvatarService;
 import com.ttjobs.backend.service.UserCvService;
+import com.ttjobs.backend.service.UserInterviewService;
 import com.ttjobs.backend.service.UserProfileService;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -34,6 +39,10 @@ public class UserController {
     private UserAvatarService userAvatarService;
     @Autowired
     private UserProfileService userProfileService;
+    @Autowired
+    private UserInterviewService userInterviewService;
+    @Autowired
+    private CandidateDashboardService candidateDashboardService;
 
     @GetMapping("/admin/test")
     public String adminTest() {
@@ -48,6 +57,16 @@ public class UserController {
     @GetMapping("/users/me")
     public UserProfileDTO getMyProfile() {
         return userProfileService.getMyProfile();
+    }
+
+    @GetMapping("/users/me/interviews")
+    public List<InterviewScheduleDTO> getMyInterviews() {
+        return userInterviewService.getMyInterviews();
+    }
+
+    @GetMapping("/users/dashboard")
+    public CandidateDashboardDTO getMyDashboard() {
+        return candidateDashboardService.getMyDashboard();
     }
 
     @PutMapping("/users/me")

@@ -24,6 +24,8 @@ import org.springframework.web.server.ResponseStatusException;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.LocalDateTime;
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -484,13 +486,13 @@ public class JobApplicationService {
             java.net.URLConnection connection = new java.net.URL(cvUrl).openConnection();
             connection.setConnectTimeout(DOWNLOAD_CONNECT_TIMEOUT_MS);
             connection.setReadTimeout(DOWNLOAD_READ_TIMEOUT_MS);
-            String contentType = connection.getContentType();
+            String contentType = inferCvContentType(fileName, connection.getContentType());
             if (contentType == null || contentType.isBlank()) {
                 contentType = "application/octet-stream";
             }
             response.setContentType(contentType);
-            String safeName = (fileName == null || fileName.isBlank()) ? "cv" : fileName;
-            response.setHeader("Content-Disposition", "inline; filename=\"" + safeName + "\"");
+            String safeName = sanitizeCvDownloadName(fileName, contentType);
+            response.setHeader("Content-Disposition", buildInlineDisposition(safeName));
 
             try (java.io.InputStream input = connection.getInputStream();
                  java.io.OutputStream output = response.getOutputStream()) {
@@ -509,6 +511,47 @@ public class JobApplicationService {
         } catch (IOException e) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to stream CV");
         }
+    }
+
+    private String buildInlineDisposition(String fileName) {
+        String encoded = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20");
+        return "inline; filename=\"" + fileName.replace("\"", "") + "\"; filename*=UTF-8''" + encoded;
+    }
+
+    private String sanitizeCvDownloadName(String fileName, String contentType) {
+        String safeName = (fileName == null || fileName.isBlank()) ? "cv" : fileName.trim();
+        if (!safeName.contains(".")) {
+            safeName = safeName + guessCvExtension(contentType);
+        }
+        return safeName.replace("\r", "").replace("\n", "");
+    }
+
+    private String inferCvContentType(String fileName, String fallbackContentType) {
+        String lowerName = fileName == null ? "" : fileName.toLowerCase();
+        if (lowerName.endsWith(".pdf")) {
+            return "application/pdf";
+        }
+        if (lowerName.endsWith(".doc")) {
+            return "application/msword";
+        }
+        if (lowerName.endsWith(".docx")) {
+            return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        }
+        return fallbackContentType;
+    }
+
+    private String guessCvExtension(String contentType) {
+        String type = contentType == null ? "" : contentType.toLowerCase();
+        if (type.contains("pdf")) {
+            return ".pdf";
+        }
+        if (type.contains("officedocument.wordprocessingml.document")) {
+            return ".docx";
+        }
+        if (type.contains("msword")) {
+            return ".doc";
+        }
+        return ".pdf";
     }
 
     private byte[] downloadCvBytes(String cvUrl) {
