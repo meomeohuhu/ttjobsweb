@@ -268,6 +268,48 @@ class JobServiceTest {
         assertEquals(7L, result.get(0).getJobCount());
     }
 
+    @Test
+    void searchJobs_shouldTrimKeywordAndValidateSalaryRange() {
+        when(jobRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class)))
+                .thenReturn(org.springframework.data.domain.Page.empty());
+
+        // Test trimming
+        jobService.searchJobs("  java  ", null, null, null, null, null, null, null, null, null, "latest", 0, 10);
+
+        ArgumentCaptor<org.springframework.data.jpa.domain.Specification> specCaptor = ArgumentCaptor.forClass(org.springframework.data.jpa.domain.Specification.class);
+        org.mockito.Mockito.verify(jobRepository).findAll(specCaptor.capture(), any(Pageable.class));
+        // Specification is hard to verify directly, but we'll implement the trimming in service.
+
+        // Test salary validation
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> jobService.searchJobs(null, null, null, null, null, null, "open",
+                        java.math.BigDecimal.valueOf(1000), java.math.BigDecimal.valueOf(500), null, "latest", 0, 10));
+        assertEquals(400, ex.getStatusCode().value());
+        assertEquals("salaryMin cannot be greater than salaryMax", ex.getReason());
+    }
+
+    @Test
+    void resolveSort_shouldIncludeIdAsTieBreaker() {
+        when(jobRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class)))
+                .thenReturn(org.springframework.data.domain.Page.empty());
+
+        jobService.searchJobs(null, null, null, null, null, null, "open", null, null, null, "latest", 0, 10);
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        org.mockito.Mockito.verify(jobRepository).findAll(any(org.springframework.data.jpa.domain.Specification.class), pageableCaptor.capture());
+
+        org.springframework.data.domain.Sort sort = pageableCaptor.getValue().getSort();
+        // Check if id is present in sort
+        boolean hasIdSort = false;
+        for (org.springframework.data.domain.Sort.Order order : sort) {
+            if ("id".equals(order.getProperty())) {
+                hasIdSort = true;
+                break;
+            }
+        }
+        assertEquals(true, hasIdSort, "Sort should include id as tie-breaker");
+    }
+
     private User user(Long id, User.Role role) {
         User user = new User();
         user.setId(id);

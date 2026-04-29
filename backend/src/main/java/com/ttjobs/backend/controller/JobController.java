@@ -38,7 +38,7 @@ public class JobController {
             @RequestParam(required = false) String sort,
             @RequestParam(required = false) @Min(0) Integer page,
             @RequestParam(required = false) @Min(1) @Max(100) Integer size) {
-        String effectiveKeyword = (keyword != null && !keyword.isBlank()) ? keyword : q;
+        String effectiveKeyword = (keyword != null && !keyword.isBlank()) ? keyword.trim() : (q != null ? q.trim() : null);
         return jobService.getPublicJobs(effectiveKeyword, category, location, companyName, jobType, experienceLevel,
                 salaryMin, salaryMax, sort, page, size);
     }
@@ -111,10 +111,12 @@ public class JobController {
             @RequestParam(required = false) BigDecimal salaryMin,
             @RequestParam(required = false) BigDecimal salaryMax,
             @RequestParam(required = false) List<String> skills,
+            @RequestParam(required = false) String sort,
             @RequestParam(required = false, defaultValue = "0") @Min(0) Integer page,
             @RequestParam(required = false, defaultValue = "20") @Min(1) @Max(100) Integer size) {
-        String effectiveKeyword = (keyword != null && !keyword.isBlank()) ? keyword : title;
+        String effectiveKeyword = (keyword != null && !keyword.isBlank()) ? keyword.trim() : (title != null ? title.trim() : null);
+        String effectiveSort = (sort != null && !sort.isBlank()) ? sort.trim() : "latest";
         return jobService.searchJobs(effectiveKeyword, null, location, companyName, jobType, experienceLevel,
-                status, salaryMin, salaryMax, skills, "latest", page, size);
+                status, salaryMin, salaryMax, skills, effectiveSort, page, size);
     }
 }
