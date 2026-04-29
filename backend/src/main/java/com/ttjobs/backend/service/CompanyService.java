@@ -1,6 +1,7 @@
 package com.ttjobs.backend.service;
 
 import com.ttjobs.backend.dto.CompanyDTO;
+import com.ttjobs.backend.dto.CompanyRequest;
 import com.ttjobs.backend.dto.CompanyMemberDTO;
 import com.ttjobs.backend.dto.CompanyMemberUpsertRequest;
 import com.ttjobs.backend.dto.CompanyPublicPageDTO;
@@ -106,15 +107,21 @@ public class CompanyService {
         return dto;
     }
 
-    public CompanyDTO createCompany(Company company) {
+    public CompanyDTO createCompany(CompanyRequest request) {
         User currentUser = authContextService.requireCurrentUser();
         requireRecruiterOrAdmin(currentUser);
 
+        Company company = new Company();
+        company.setName(request.getName());
+        company.setDescription(request.getDescription());
+        company.setLocation(request.getLocation());
+        company.setWebsite(request.getWebsite());
+        company.setIndustry(request.getIndustry());
+        company.setLogoUrl(request.getLogoUrl());
+
         // Force ownership to current user to prevent privilege injection.
         company.setCreatedBy(currentUser);
-        if (company.getCreatedAt() == null) {
-            company.setCreatedAt(LocalDateTime.now());
-        }
+        company.setCreatedAt(LocalDateTime.now());
 
         Company savedCompany = companyRepository.save(company);
 
@@ -133,7 +140,7 @@ public class CompanyService {
         return convertToDTO(savedCompany);
     }
 
-    public CompanyDTO updateCompany(Long id, Company companyDetails) {
+    public CompanyDTO updateCompany(Long id, CompanyRequest request) {
         User currentUser = authContextService.requireCurrentUser();
 
         Company company = companyRepository.findByIdAndDeletedAtIsNull(id)
@@ -141,23 +148,23 @@ public class CompanyService {
 
         requireCompanyManagePermission(currentUser, company);
 
-        if (companyDetails.getName() != null) {
-            company.setName(companyDetails.getName());
+        if (request.getName() != null) {
+            company.setName(request.getName());
         }
-        if (companyDetails.getDescription() != null) {
-            company.setDescription(companyDetails.getDescription());
+        if (request.getDescription() != null) {
+            company.setDescription(request.getDescription());
         }
-        if (companyDetails.getLocation() != null) {
-            company.setLocation(companyDetails.getLocation());
+        if (request.getLocation() != null) {
+            company.setLocation(request.getLocation());
         }
-        if (companyDetails.getWebsite() != null) {
-            company.setWebsite(companyDetails.getWebsite());
+        if (request.getWebsite() != null) {
+            company.setWebsite(request.getWebsite());
         }
-        if (companyDetails.getIndustry() != null) {
-            company.setIndustry(companyDetails.getIndustry());
+        if (request.getIndustry() != null) {
+            company.setIndustry(request.getIndustry());
         }
-        if (companyDetails.getLogoUrl() != null) {
-            company.setLogoUrl(companyDetails.getLogoUrl());
+        if (request.getLogoUrl() != null) {
+            company.setLogoUrl(request.getLogoUrl());
         }
 
         Company saved = companyRepository.save(company);

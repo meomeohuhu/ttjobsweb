@@ -1,12 +1,16 @@
 package com.ttjobs.backend.controller;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import com.ttjobs.backend.entity.Company;
 import com.ttjobs.backend.dto.CompanyDTO;
+import com.ttjobs.backend.dto.CompanyRequest;
+import com.ttjobs.backend.exception.ResourceNotFoundException;
 import com.ttjobs.backend.dto.CompanyMemberDTO;
 import com.ttjobs.backend.dto.CompanyMemberUpsertRequest;
 import com.ttjobs.backend.dto.CompanyPublicPageDTO;
@@ -16,6 +20,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/companies")
+@Validated
 public class CompanyController {
 
     @Autowired
@@ -27,14 +32,15 @@ public class CompanyController {
     }
 
     @GetMapping("/top-saved-jobs")
-    public List<CompanyDTO> getTopCompaniesBySavedJobs(@RequestParam(defaultValue = "6") int limit) {
+    public List<CompanyDTO> getTopCompaniesBySavedJobs(
+            @RequestParam(defaultValue = "6") @Min(1) @Max(100) int limit) {
         return companyService.getTopCompaniesBySavedJobs(limit);
     }
 
     @GetMapping("/{id}")
     public CompanyDTO getCompanyById(@PathVariable Long id) {
         return companyService.getCompanyById(id)
-                .orElseThrow(() -> new RuntimeException("Company not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Company not found"));
     }
 
     @GetMapping("/{companyId}/jobs")
@@ -48,13 +54,13 @@ public class CompanyController {
     }
 
     @PostMapping
-    public CompanyDTO createCompany(@RequestBody Company company) {
-        return companyService.createCompany(company);
+    public CompanyDTO createCompany(@Valid @RequestBody CompanyRequest request) {
+        return companyService.createCompany(request);
     }
 
     @PutMapping("/{id}")
-    public CompanyDTO updateCompany(@PathVariable Long id, @RequestBody Company company) {
-        return companyService.updateCompany(id, company);
+    public CompanyDTO updateCompany(@PathVariable Long id, @Valid @RequestBody CompanyRequest request) {
+        return companyService.updateCompany(id, request);
     }
 
     @PostMapping(value = "/{id}/logo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
