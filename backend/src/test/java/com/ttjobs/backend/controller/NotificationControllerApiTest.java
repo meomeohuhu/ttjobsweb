@@ -1,6 +1,8 @@
 package com.ttjobs.backend.controller;
 
 import com.ttjobs.backend.dto.NotificationDTO;
+import com.ttjobs.backend.dto.NotificationPreferenceDTO;
+import com.ttjobs.backend.dto.NotificationPreferenceRequest;
 import com.ttjobs.backend.service.JwtService;
 import com.ttjobs.backend.service.NotificationPreferenceService;
 import com.ttjobs.backend.service.NotificationService;
@@ -15,6 +17,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.http.MediaType;
+
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
@@ -78,5 +84,53 @@ class NotificationControllerApiTest {
 
         mockMvc.perform(put("/api/notifications/read-all"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void getPreferences_shouldReturnDTO() throws Exception {
+        NotificationPreferenceDTO dto = new NotificationPreferenceDTO();
+        dto.setInAppEnabled(true);
+        dto.setEmailEnabled(false);
+
+        when(notificationPreferenceService.getMyPreferences()).thenReturn(dto);
+
+        mockMvc.perform(get("/api/notifications/preferences"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.inAppEnabled").value(true))
+                .andExpect(jsonPath("$.emailEnabled").value(false));
+    }
+
+    @Test
+    void updatePreferences_withValidPayload_shouldReturnOk() throws Exception {
+        NotificationPreferenceRequest request = new NotificationPreferenceRequest();
+        request.setInAppEnabled(true);
+        request.setEmailEnabled(true);
+
+        NotificationPreferenceDTO response = new NotificationPreferenceDTO();
+        response.setInAppEnabled(true);
+        response.setEmailEnabled(true);
+
+        when(notificationPreferenceService.updateMyPreferences(any(NotificationPreferenceRequest.class))).thenReturn(response);
+
+        mockMvc.perform(put("/api/notifications/preferences")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(new ObjectMapper().writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.inAppEnabled").value(true))
+                .andExpect(jsonPath("$.emailEnabled").value(true));
+    }
+
+    @Test
+    void updatePreferences_withInvalidPayload_shouldReturnBadRequest() throws Exception {
+        NotificationPreferenceRequest request = new NotificationPreferenceRequest();
+        // Missing fields
+
+        mockMvc.perform(put("/api/notifications/preferences")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(new ObjectMapper().writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Validation failed"))
+                .andExpect(jsonPath("$.errors.inAppEnabled").exists())
+                .andExpect(jsonPath("$.errors.emailEnabled").exists());
     }
 }
