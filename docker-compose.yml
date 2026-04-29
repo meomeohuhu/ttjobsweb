@@ -1,0 +1,42 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: ttjobs-postgres
+    environment:
+      POSTGRES_DB: ttjobs
+      POSTGRES_USER: postgres 
+      POSTGRES_PASSWORD: admin
+    ports:
+      - "5432:5432"
+    volumes:
+      - ttjobs_db:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+    container_name: ttjobs-backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/ttjobs
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: admin
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      SPRING_FLYWAY_ENABLED: "true"
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - ai-service
+
+  ai-service:
+    build:
+      context: ./ai-service
+    container_name: ttjobs-ai
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./ai-service/models:/app/models
+
+volumes:
+  ttjobs_db:

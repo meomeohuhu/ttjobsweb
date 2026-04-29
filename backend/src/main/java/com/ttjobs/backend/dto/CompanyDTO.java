@@ -10,4 +10,8 @@ public class CompanyDTO {
     private String location;
     private String website;
     private String industry;
+    private String logoUrl;
+    private Long jobCount;
+    private Long savedJobCount;
+    private Long followerCount;
 }
