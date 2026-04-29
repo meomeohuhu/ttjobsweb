@@ -1,10 +1,12 @@
 package com.ttjobs.backend.controller;
 
 import com.ttjobs.backend.dto.RecruiterDashboardDTO;
+import com.ttjobs.backend.dto.RecruiterWorkspaceDTO;
+import com.ttjobs.backend.dto.RecruiterApplicationDTO;
+import com.ttjobs.backend.dto.RecruiterJobDTO;
 import com.ttjobs.backend.dto.RecruiterApplicationDetailDTO;
 import com.ttjobs.backend.dto.RecruiterActivityLogDTO;
 import com.ttjobs.backend.dto.RecruiterCompanyDTO;
-import com.ttjobs.backend.dto.RecruiterJobDTO;
 import com.ttjobs.backend.service.JwtService;
 import com.ttjobs.backend.service.RecruiterDashboardService;
 import com.ttjobs.backend.service.RecruiterWorkspaceService;
@@ -17,6 +19,9 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Map;
 import java.util.List;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -38,6 +43,45 @@ class RecruiterDashboardControllerApiTest {
 
     @MockBean
     private JwtService jwtService;
+
+    @Test
+    void getWorkspaceSummary_shouldReturnForbidden_whenServiceThrowsForbidden() throws Exception {
+        when(recruiterWorkspaceService.getWorkspaceSummary())
+                .thenThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "Only recruiter can access"));
+
+        mockMvc.perform(get("/api/recruiter/workspace"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void getWorkspaceSummary_shouldReturnUnauthorized_whenServiceThrowsUnauthorized() throws Exception {
+        when(recruiterWorkspaceService.getWorkspaceSummary())
+                .thenThrow(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+
+        mockMvc.perform(get("/api/recruiter/workspace"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void getWorkspaceSummary_shouldReturnPayload() throws Exception {
+        RecruiterWorkspaceDTO dto = new RecruiterWorkspaceDTO();
+        RecruiterJobDTO job = new RecruiterJobDTO();
+        job.setId(100L);
+        job.setTitle("Job 1");
+        dto.setOpenJobs(List.of(job));
+        dto.setApplicationStatusCounts(Map.of("submitted", 1L));
+        RecruiterApplicationDTO app = new RecruiterApplicationDTO();
+        app.setId(1000L);
+        dto.setRecentApplications(List.of(app));
+
+        when(recruiterWorkspaceService.getWorkspaceSummary()).thenReturn(dto);
+
+        mockMvc.perform(get("/api/recruiter/workspace"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.openJobs[0].id").value(100))
+                .andExpect(jsonPath("$.applicationStatusCounts.submitted").value(1))
+                .andExpect(jsonPath("$.recentApplications[0].id").value(1000));
+    }
 
     @Test
     void getDashboard_shouldReturnPayload() throws Exception {

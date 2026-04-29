@@ -8,6 +8,7 @@ import com.ttjobs.backend.dto.RecruiterApplicationDTO;
 import com.ttjobs.backend.dto.RecruiterApplicationDetailDTO;
 import com.ttjobs.backend.dto.RecruiterCompanyDTO;
 import com.ttjobs.backend.dto.RecruiterJobDTO;
+import com.ttjobs.backend.dto.RecruiterWorkspaceDTO;
 import com.ttjobs.backend.dto.RecruiterReportDTO;
 import com.ttjobs.backend.dto.RecruitmentCampaignDTO;
 import com.ttjobs.backend.dto.RecruitmentCampaignRequest;
@@ -72,6 +73,54 @@ public class RecruiterWorkspaceService {
     private RecruitmentCampaignRepository campaignRepository;
     @Autowired
     private UserRepository userRepository;
+
+    public RecruiterWorkspaceDTO getWorkspaceSummary() {
+        User currentUser = requireRecruiterOrAdmin();
+        List<Job> managedJobs = loadManagedJobs(currentUser);
+        List<Job> openJobs = managedJobs.stream()
+                .filter(job -> "open".equalsIgnoreCase(job.getStatus()))
+                .toList();
+
+        Set<Long> openJobIds = openJobs.stream()
+                .map(Job::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        List<JobApplication> allApplications = loadManagedApplications(currentUser);
+        List<JobApplication> openJobApplications = allApplications.stream()
+                .filter(app -> app.getJob() != null && openJobIds.contains(app.getJob().getId()))
+                .toList();
+
+        Map<String, Long> statusCounts = openJobApplications.stream()
+                .collect(Collectors.groupingBy(
+                        app -> app.getStatus() == null ? "submitted" : app.getStatus().toLowerCase(Locale.ROOT),
+                        Collectors.counting()
+                ));
+
+        List<RecruiterApplicationDTO> recentApplications = allApplications.stream()
+                .sorted(Comparator.comparing(JobApplication::getApplicationDate, Comparator.nullsLast(Comparator.reverseOrder())))
+                .limit(10)
+                .map(this::toApplicationDto)
+                .toList();
+
+        // For openJobs DTOs, we need application counts
+        Map<Long, Long> applicationCounts = allApplications.stream()
+                .filter(app -> app.getJob() != null)
+                .collect(Collectors.groupingBy(app -> app.getJob().getId(), Collectors.counting()));
+        LocalDateTime newThreshold = LocalDateTime.now().minusDays(7);
+        Map<Long, Long> newApplicationCounts = allApplications.stream()
+                .filter(app -> app.getJob() != null && app.getApplicationDate() != null && !app.getApplicationDate().isBefore(newThreshold))
+                .collect(Collectors.groupingBy(app -> app.getJob().getId(), Collectors.counting()));
+
+        RecruiterWorkspaceDTO dto = new RecruiterWorkspaceDTO();
+        dto.setOpenJobs(openJobs.stream()
+                .map(job -> toJobDto(job, applicationCounts, newApplicationCounts))
+                .toList());
+        dto.setApplicationStatusCounts(statusCounts);
+        dto.setRecentApplications(recentApplications);
+
+        return dto;
+    }
 
     public List<RecruiterCompanyDTO> getManagedCompanies() {
         User currentUser = requireRecruiterOrAdmin();
