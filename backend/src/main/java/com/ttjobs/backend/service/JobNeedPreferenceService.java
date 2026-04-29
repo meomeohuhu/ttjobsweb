@@ -21,12 +21,12 @@ public class JobNeedPreferenceService {
     private AuthContextService authContextService;
 
     public JobNeedPreferenceDTO getMyPreferences() {
-        User currentUser = requireCandidate();
+        User currentUser = authContextService.requireCurrentUser();
         return toDto(getOrCreate(currentUser.getId()));
     }
 
     public JobNeedPreferenceDTO updateMyPreferences(JobNeedPreferenceRequest request) {
-        User currentUser = requireCandidate();
+        User currentUser = authContextService.requireCurrentUser();
         JobNeedPreference preference = getOrCreate(currentUser.getId());
 
         if (request.getDesiredTitle() != null) {
@@ -83,14 +83,6 @@ public class JobNeedPreferenceService {
         preference.setCreatedAt(LocalDateTime.now());
         preference.setUpdatedAt(LocalDateTime.now());
         return jobNeedPreferenceRepository.save(preference);
-    }
-
-    private User requireCandidate() {
-        User currentUser = authContextService.requireCurrentUser();
-        if (currentUser.getRole() != User.Role.CANDIDATE) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only candidate can manage job needs");
-        }
-        return currentUser;
     }
 
     private void validateSalaryRange(JobNeedPreference preference) {

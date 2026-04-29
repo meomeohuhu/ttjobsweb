@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -105,9 +106,6 @@ public class RecommendationService {
 
     public List<JobDTO> recommendByJobNeeds() {
         User currentUser = authContextService.requireCurrentUser();
-        if (currentUser.getRole() != User.Role.CANDIDATE) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only candidate can request recommendations");
-        }
 
         JobNeedPreference preference = jobNeedPreferenceService.getOrCreate(currentUser.getId());
         if (!jobNeedPreferenceService.hasConfiguredCriteria(preference)) {
@@ -144,7 +142,7 @@ public class RecommendationService {
 
         return jobRepository.findAll(spec, PageRequest.of(0, MAX_JOBS))
                 .stream()
-                .map(this::toDto)
+                .map(job -> toDto(job, preference))
                 .collect(Collectors.toList());
     }
 
@@ -228,6 +226,10 @@ public class RecommendationService {
     }
 
     private JobDTO toDto(Job job) {
+        return toDto(job, null);
+    }
+
+    private JobDTO toDto(Job job, JobNeedPreference preference) {
         JobDTO dto = new JobDTO();
         dto.setId(job.getId());
         dto.setTitle(job.getTitle());
@@ -247,6 +249,57 @@ public class RecommendationService {
             dto.setCompanyId(job.getCompany().getId());
             dto.setCompanyName(job.getCompany().getName());
         }
+        if (preference != null) {
+            List<String> reasons = resolveMatchReasons(job, preference);
+            dto.setMatchReasons(reasons);
+            dto.setMatchScore(Math.min(98, 55 + reasons.size() * 9));
+        }
         return dto;
+    }
+
+    private List<String> resolveMatchReasons(Job job, JobNeedPreference preference) {
+        List<String> reasons = new ArrayList<>();
+        if (containsIgnoreCase(job.getTitle(), preference.getDesiredTitle())
+                || containsIgnoreCase(job.getDescription(), preference.getDesiredTitle())) {
+            reasons.add("Trùng vị trí mong muốn");
+        }
+        if (containsIgnoreCase(job.getLocation(), preference.getDesiredLocation())) {
+            reasons.add("Đúng khu vực ưu tiên");
+        }
+        if (sameIgnoreCase(job.getCategory(), preference.getDesiredCategory())) {
+            reasons.add("Trùng ngành nghề");
+        }
+        if (sameIgnoreCase(job.getJobType(), preference.getDesiredJobType())) {
+            reasons.add("Đúng loại hình làm việc");
+        }
+        if (sameIgnoreCase(job.getExperienceLevel(), preference.getDesiredExperienceLevel())) {
+            reasons.add("Phù hợp mức kinh nghiệm");
+        }
+        if (preference.getMinSalary() != null && job.getSalaryMax() != null
+                && job.getSalaryMax().compareTo(preference.getMinSalary()) >= 0) {
+            reasons.add("Đạt mức lương tối thiểu");
+        }
+        if (Boolean.TRUE.equals(preference.getRemoteOnly())
+                && (containsIgnoreCase(job.getLocation(), "remote")
+                || containsIgnoreCase(job.getDescription(), "remote")
+                || containsIgnoreCase(job.getDescription(), "hybrid"))) {
+            reasons.add("Có yếu tố remote/hybrid");
+        }
+        if (reasons.isEmpty()) {
+            reasons.add("Phù hợp với nhu cầu đã lưu");
+        }
+        return reasons;
+    }
+
+    private boolean containsIgnoreCase(String value, String query) {
+        return value != null && query != null && !query.isBlank()
+                && value.toLowerCase(Locale.ROOT).contains(query.toLowerCase(Locale.ROOT));
+    }
+
+    private boolean sameIgnoreCase(String first, String second) {
+        if (first == null || second == null || second.isBlank()) {
+            return false;
+        }
+        return Objects.equals(first.trim().toLowerCase(Locale.ROOT), second.trim().toLowerCase(Locale.ROOT));
     }
 }

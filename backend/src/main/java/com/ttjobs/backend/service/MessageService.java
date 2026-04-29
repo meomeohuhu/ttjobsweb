@@ -149,9 +149,16 @@ public class MessageService {
             }
             String title = "Tin nhắn mới";
             String content = "Bạn có tin nhắn mới từ " + displayName(sender);
-            String targetUrl = "/recruiter/chat?conversationId=" + conversationId;
+            String targetUrl = chatTargetUrl(member.getUser(), conversationId);
             notificationService.createNotification(member.getUser(), title, content, "CHAT_MESSAGE", targetUrl);
         }
+    }
+
+    private String chatTargetUrl(User recipient, Long conversationId) {
+        if (recipient != null && recipient.getRole() == User.Role.CANDIDATE) {
+            return "/messages?conversationId=" + conversationId;
+        }
+        return "/recruiter/chat?conversationId=" + conversationId;
     }
 
     private String displayName(User user) {

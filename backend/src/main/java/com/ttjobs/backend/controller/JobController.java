@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Min;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import com.ttjobs.backend.entity.Job;
+import com.ttjobs.backend.dto.JobCategoryStatDTO;
 import com.ttjobs.backend.dto.JobDTO;
 import com.ttjobs.backend.service.JobService;
 import com.ttjobs.backend.exception.ResourceNotFoundException;
@@ -25,8 +26,39 @@ public class JobController {
     private JobService jobService;
 
     @GetMapping
-    public List<JobDTO> getAllJobs() {
-        return jobService.getAllJobs();
+    public List<JobDTO> getAllJobs(@RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String location,
+            @RequestParam(required = false) String companyName,
+            @RequestParam(required = false) String jobType,
+            @RequestParam(required = false) String experienceLevel,
+            @RequestParam(required = false) BigDecimal salaryMin,
+            @RequestParam(required = false) BigDecimal salaryMax,
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false) @Min(0) Integer page,
+            @RequestParam(required = false) @Min(1) @Max(100) Integer size) {
+        String effectiveKeyword = (keyword != null && !keyword.isBlank()) ? keyword : q;
+        return jobService.getPublicJobs(effectiveKeyword, category, location, companyName, jobType, experienceLevel,
+                salaryMin, salaryMax, sort, page, size);
+    }
+
+    @GetMapping("/highlights")
+    public List<JobDTO> getHighlightedJobs(@RequestParam(required = false, defaultValue = "high_salary") String type,
+            @RequestParam(required = false, defaultValue = "12") @Min(1) Integer size) {
+        return jobService.getHighlightedJobs(type, size);
+    }
+
+    @GetMapping("/best")
+    public List<JobDTO> getBestJobs(@RequestParam(required = false, defaultValue = "most_saved") String type,
+            @RequestParam(required = false, defaultValue = "12") @Min(1) Integer size) {
+        return jobService.getBestJobs(type, size);
+    }
+
+    @GetMapping("/categories/top")
+    public List<JobCategoryStatDTO> getTopCategories(
+            @RequestParam(required = false, defaultValue = "8") @Min(1) Integer size) {
+        return jobService.getTopCategories(size);
     }
 
     @GetMapping("/{id}")
@@ -82,7 +114,7 @@ public class JobController {
             @RequestParam(required = false, defaultValue = "0") @Min(0) Integer page,
             @RequestParam(required = false, defaultValue = "20") @Min(1) @Max(100) Integer size) {
         String effectiveKeyword = (keyword != null && !keyword.isBlank()) ? keyword : title;
-        return jobService.searchJobs(effectiveKeyword, location, companyName, jobType, experienceLevel,
-                status, salaryMin, salaryMax, skills, page, size);
+        return jobService.searchJobs(effectiveKeyword, null, location, companyName, jobType, experienceLevel,
+                status, salaryMin, salaryMax, skills, "latest", page, size);
     }
 }

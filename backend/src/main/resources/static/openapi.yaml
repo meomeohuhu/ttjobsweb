@@ -574,6 +574,85 @@ paths:
                 $ref: '#/components/schemas/JobDTO'
         "403":
           description: Forbidden
+  /api/jobs/highlights:
+    get:
+      tags: [Jobs]
+      summary: Get highlighted public jobs
+      parameters:
+        - in: query
+          name: type
+          schema:
+            type: string
+            default: high_salary
+            enum: [high_salary]
+        - in: query
+          name: size
+          schema:
+            type: integer
+            default: 12
+            minimum: 1
+            maximum: 50
+      responses:
+        "200":
+          description: Highlighted job list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/JobDTO'
+        "400":
+          description: Invalid highlight type
+  /api/jobs/best:
+    get:
+      tags: [Jobs]
+      summary: Get best public jobs
+      parameters:
+        - in: query
+          name: type
+          schema:
+            type: string
+            default: most_saved
+            enum: [most_saved]
+        - in: query
+          name: size
+          schema:
+            type: integer
+            default: 12
+            minimum: 1
+            maximum: 50
+      responses:
+        "200":
+          description: Best job list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/JobDTO'
+        "400":
+          description: Invalid best job type
+  /api/jobs/categories/top:
+    get:
+      tags: [Jobs]
+      summary: Get top job categories
+      parameters:
+        - in: query
+          name: size
+          schema:
+            type: integer
+            default: 8
+            minimum: 1
+            maximum: 24
+      responses:
+        "200":
+          description: Top job category list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/JobCategoryStatDTO'
   /api/jobs/{id}:
     get:
       tags: [Jobs]
@@ -1521,6 +1600,18 @@ components:
         companyLogoUrl:
           type: string
         savedCount:
+          type: integer
+          format: int64
+    JobCategoryStatDTO:
+      type: object
+      properties:
+        category:
+          type: string
+          example: INFORMATION-TECHNOLOGY
+        label:
+          type: string
+          example: Công nghệ Thông tin
+        jobCount:
           type: integer
           format: int64
     JobWriteRequest:

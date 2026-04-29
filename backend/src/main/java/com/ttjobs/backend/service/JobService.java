@@ -1,5 +1,6 @@
 package com.ttjobs.backend.service;
 
+import com.ttjobs.backend.dto.JobCategoryStatDTO;
 import com.ttjobs.backend.dto.JobDTO;
 import com.ttjobs.backend.entity.Company;
 import com.ttjobs.backend.entity.Job;
@@ -11,6 +12,7 @@ import com.ttjobs.backend.repository.JobWithSavedCount;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -56,6 +58,59 @@ public class JobService {
         return jobRepository.findJobsWithSavedCount(OPEN, pageable)
                 .stream()
                 .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    public List<JobDTO> getPublicJobs(String keyword, String category, String location, String companyName,
+                                      String jobType, String experienceLevel, BigDecimal salaryMin,
+                                      BigDecimal salaryMax, String sort, Integer page, Integer size) {
+        boolean hasFilters = hasText(keyword) || hasText(category) || hasText(location) || hasText(companyName)
+                || hasText(jobType) || hasText(experienceLevel) || salaryMin != null || salaryMax != null
+                || hasText(sort) || page != null || size != null;
+        if (!hasFilters) {
+            return getAllJobs();
+        }
+        return searchJobs(keyword, category, location, companyName, jobType, experienceLevel, OPEN,
+                salaryMin, salaryMax, null, sort, page, size);
+    }
+
+    public List<JobDTO> getHighlightedJobs(String type, Integer size) {
+        String normalizedType = (type == null || type.isBlank()) ? "high_salary" : type.trim().toLowerCase();
+        if (!"high_salary".equals(normalizedType)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid highlight type");
+        }
+
+        int safeSize = size == null ? 12 : Math.max(1, Math.min(size, 50));
+        Pageable pageable = PageRequest.of(0, safeSize);
+        return jobRepository.findHighlightedJobs(OPEN, pageable)
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    public List<JobDTO> getBestJobs(String type, Integer size) {
+        String normalizedType = (type == null || type.isBlank()) ? "most_saved" : type.trim().toLowerCase();
+        if (!"most_saved".equals(normalizedType)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid best job type");
+        }
+
+        int safeSize = size == null ? 12 : Math.max(1, Math.min(size, 50));
+        Pageable pageable = PageRequest.of(0, safeSize);
+        return jobRepository.findBestJobs(OPEN, pageable)
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    public List<JobCategoryStatDTO> getTopCategories(Integer size) {
+        int safeSize = size == null ? 8 : Math.max(1, Math.min(size, 24));
+        Pageable pageable = PageRequest.of(0, safeSize);
+        return jobRepository.findTopCategories(OPEN, pageable)
+                .stream()
+                .map(item -> {
+                    String category = normalizeCategoryCode(item.getCategory());
+                    return new JobCategoryStatDTO(category, resolveCategoryLabel(category), item.getJobCount());
+                })
                 .collect(Collectors.toList());
     }
 
@@ -223,10 +278,18 @@ public class JobService {
                                    String jobType, String experienceLevel, String status,
                                    BigDecimal salaryMin, BigDecimal salaryMax, List<String> skills,
                                    Integer page, Integer size) {
+        return searchJobs(keyword, null, location, companyName, jobType, experienceLevel, status,
+                salaryMin, salaryMax, skills, "latest", page, size);
+    }
+
+    public List<JobDTO> searchJobs(String keyword, String category, String location, String companyName,
+                                   String jobType, String experienceLevel, String status,
+                                   BigDecimal salaryMin, BigDecimal salaryMax, List<String> skills,
+                                   String sort, Integer page, Integer size) {
         String normalizedStatus = normalizeJobStatus(status, OPEN);
         int safePage = page == null ? 0 : Math.max(page, 0);
-        int safeSize = size == null ? 20 : Math.max(size, 1);
-        Pageable pageable = PageRequest.of(safePage, safeSize);
+        int safeSize = size == null ? 20 : Math.max(1, Math.min(size, 100));
+        Pageable pageable = PageRequest.of(safePage, safeSize, resolveSort(sort));
 
         Specification<Job> spec = Specification.where(JobSpecifications.activeJobs());
         if (keyword != null && !keyword.isBlank()) {
@@ -234,6 +297,9 @@ public class JobService {
         }
         if (location != null && !location.isBlank()) {
             spec = spec.and(JobSpecifications.locationLike(location));
+        }
+        if (category != null && !category.isBlank()) {
+            spec = spec.and(JobSpecifications.categoryIn(List.of(category)));
         }
         if (companyName != null && !companyName.isBlank()) {
             spec = spec.and(JobSpecifications.companyNameLike(companyName));
@@ -261,6 +327,29 @@ public class JobService {
                 .stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
+    }
+
+    private Sort resolveSort(String sort) {
+        String normalized = sort == null ? "latest" : sort.trim().toLowerCase();
+        return switch (normalized) {
+            case "salary_high", "salary_desc" -> Sort.by(
+                    Sort.Order.desc("salaryMax").nullsLast(),
+                    Sort.Order.desc("salary").nullsLast(),
+                    Sort.Order.desc("salaryMin").nullsLast(),
+                    Sort.Order.desc("postedDate").nullsLast()
+            );
+            case "salary_low", "salary_asc" -> Sort.by(
+                    Sort.Order.asc("salaryMin").nullsLast(),
+                    Sort.Order.asc("salary").nullsLast(),
+                    Sort.Order.asc("salaryMax").nullsLast(),
+                    Sort.Order.desc("postedDate").nullsLast()
+            );
+            default -> Sort.by(Sort.Order.desc("postedDate").nullsLast(), Sort.Order.desc("id"));
+        };
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     // Recruiter can list jobs of a specific owned company, admin can list any company jobs.
@@ -391,6 +480,28 @@ public class JobService {
             case CLOSED -> "JOB_CLOSED";
             case ARCHIVED -> "JOB_ARCHIVED";
             default -> "JOB_UPDATED";
+        };
+    }
+
+    private String normalizeCategoryCode(String category) {
+        if (category == null || category.isBlank()) {
+            return "OTHER";
+        }
+        return category.trim().toUpperCase();
+    }
+
+    private String resolveCategoryLabel(String category) {
+        return switch (category) {
+            case "SALES" -> "Kinh doanh - Bán hàng";
+            case "MARKETING" -> "Marketing - PR - Quảng cáo";
+            case "CUSTOMER-SERVICE" -> "Chăm sóc khách hàng";
+            case "HR" -> "Nhân sự - Hành chính";
+            case "INFORMATION-TECHNOLOGY" -> "Công nghệ Thông tin";
+            case "FINANCE" -> "Tài chính - Ngân hàng";
+            case "REAL-ESTATE" -> "Bất động sản";
+            case "ACCOUNTING" -> "Kế toán - Kiểm toán - Thuế";
+            case "DESIGN" -> "Thiết kế";
+            default -> "Ngành nghề khác";
         };
     }
 }

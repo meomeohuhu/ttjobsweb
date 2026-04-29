@@ -32,7 +32,7 @@ class JobNeedPreferenceServiceTest {
 
     @Test
     void getMyPreferences_shouldCreateDefaultForCandidate() {
-        User candidate = user(1L);
+        User candidate = user(1L, User.Role.CANDIDATE);
         when(authContextService.requireCurrentUser()).thenReturn(candidate);
         when(jobNeedPreferenceRepository.findById(1L)).thenReturn(Optional.empty());
         when(jobNeedPreferenceRepository.save(any(JobNeedPreference.class)))
@@ -43,7 +43,7 @@ class JobNeedPreferenceServiceTest {
 
     @Test
     void updateMyPreferences_shouldSaveCriteria() {
-        User candidate = user(2L);
+        User candidate = user(2L, User.Role.CANDIDATE);
         JobNeedPreference preference = new JobNeedPreference();
         preference.setUserId(2L);
         preference.setRemoteOnly(false);
@@ -66,7 +66,7 @@ class JobNeedPreferenceServiceTest {
 
     @Test
     void updateMyPreferences_shouldRejectInvalidSalaryRange() {
-        User candidate = user(3L);
+        User candidate = user(3L, User.Role.CANDIDATE);
         JobNeedPreference preference = new JobNeedPreference();
         preference.setUserId(3L);
 
@@ -81,10 +81,25 @@ class JobNeedPreferenceServiceTest {
                 () -> jobNeedPreferenceService.updateMyPreferences(request));
     }
 
-    private User user(Long id) {
+    @Test
+    void getMyPreferences_shouldAllowRecruiterAndAdmin() {
+        when(authContextService.requireCurrentUser()).thenReturn(user(4L, User.Role.RECRUITER));
+        when(jobNeedPreferenceRepository.findById(4L)).thenReturn(Optional.empty());
+        when(jobNeedPreferenceRepository.save(any(JobNeedPreference.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertEquals(false, jobNeedPreferenceService.getMyPreferences().getRemoteOnly());
+
+        when(authContextService.requireCurrentUser()).thenReturn(user(5L, User.Role.ADMIN));
+        when(jobNeedPreferenceRepository.findById(5L)).thenReturn(Optional.empty());
+
+        assertEquals(false, jobNeedPreferenceService.getMyPreferences().getRemoteOnly());
+    }
+
+    private User user(Long id, User.Role role) {
         User user = new User();
         user.setId(id);
-        user.setRole(User.Role.CANDIDATE);
+        user.setRole(role);
         user.setEmail("u" + id + "@mail.com");
         return user;
     }
