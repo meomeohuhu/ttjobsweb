@@ -38,15 +38,18 @@ class SavedJobServiceTest {
     private SavedJobService savedJobService;
 
     @Test
-    void saveJob_shouldReturnConflict_whenDuplicate() {
+    void saveJob_shouldReturnExisting_whenDuplicate() {
         User candidate = user(1L, User.Role.CANDIDATE);
+        SavedJob existing = new SavedJob();
+        existing.setId(100L);
+        existing.setUser(candidate);
+        existing.setJob(job(10L, "Java", "open"));
+
         when(authContextService.requireCurrentUser()).thenReturn(candidate);
-        when(savedJobRepository.existsByUserIdAndJobId(1L, 10L)).thenReturn(true);
+        when(savedJobRepository.findByUserIdAndJobId(1L, 10L)).thenReturn(Optional.of(existing));
 
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> savedJobService.saveJob(10L));
-
-        assertEquals(409, ex.getStatusCode().value());
+        SavedJobDTO result = savedJobService.saveJob(10L);
+        assertEquals(100L, result.getId());
     }
 
     @Test
@@ -61,7 +64,7 @@ class SavedJobServiceTest {
         savedJob.setSavedAt(LocalDateTime.now());
 
         when(authContextService.requireCurrentUser()).thenReturn(candidate);
-        when(savedJobRepository.existsByUserIdAndJobId(1L, 10L)).thenReturn(false);
+        when(savedJobRepository.findByUserIdAndJobId(1L, 10L)).thenReturn(Optional.empty());
         when(jobRepository.findByIdAndDeletedAtIsNull(10L)).thenReturn(Optional.of(job));
         when(savedJobRepository.save(any(SavedJob.class))).thenReturn(savedJob);
 
@@ -87,6 +90,16 @@ class SavedJobServiceTest {
     }
 
     @Test
+    void unsaveJob_shouldReturnSilently_whenNotExists() {
+        User candidate = user(1L, User.Role.CANDIDATE);
+        when(authContextService.requireCurrentUser()).thenReturn(candidate);
+        when(savedJobRepository.findByUserIdAndJobId(1L, 10L)).thenReturn(Optional.empty());
+
+        savedJobService.unsaveJob(10L);
+        // No exception thrown, no delete called
+    }
+
+    @Test
     void getMySavedJobs_shouldReturnListForCandidate() {
         User candidate = user(1L, User.Role.CANDIDATE);
         SavedJob savedJob = new SavedJob();
@@ -101,6 +114,27 @@ class SavedJobServiceTest {
         List<SavedJobDTO> result = savedJobService.getMySavedJobs();
         assertEquals(1, result.size());
         assertEquals(11L, result.get(0).getJobId());
+    }
+
+    @Test
+    void updateNote_shouldUpdateAndReturnDto() {
+        User candidate = user(1L, User.Role.CANDIDATE);
+        SavedJob savedJob = new SavedJob();
+        savedJob.setId(100L);
+        savedJob.setUser(candidate);
+        savedJob.setJob(job(10L, "Java", "open"));
+
+        com.ttjobs.backend.dto.SavedJobNoteRequest request = new com.ttjobs.backend.dto.SavedJobNoteRequest();
+        request.setNote("New note");
+        request.setTag("Important");
+
+        when(authContextService.requireCurrentUser()).thenReturn(candidate);
+        when(savedJobRepository.findByUserIdAndJobId(1L, 10L)).thenReturn(Optional.of(savedJob));
+        when(savedJobRepository.save(any(SavedJob.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        SavedJobDTO result = savedJobService.updateNote(10L, request);
+        assertEquals("New note", result.getNote());
+        assertEquals("Important", result.getTag());
     }
 
     @Test

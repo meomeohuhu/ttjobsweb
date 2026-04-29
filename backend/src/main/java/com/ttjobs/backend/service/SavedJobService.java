@@ -1,20 +1,25 @@
 package com.ttjobs.backend.service;
 
 import com.ttjobs.backend.dto.SavedJobDTO;
+import com.ttjobs.backend.dto.SavedJobNoteRequest;
 import com.ttjobs.backend.entity.Job;
 import com.ttjobs.backend.entity.SavedJob;
 import com.ttjobs.backend.entity.User;
+import com.ttjobs.backend.exception.ResourceNotFoundException;
 import com.ttjobs.backend.repository.JobRepository;
 import com.ttjobs.backend.repository.SavedJobRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
+@Transactional
 public class SavedJobService {
 
     @Autowired
@@ -32,12 +37,13 @@ public class SavedJobService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only candidate can save jobs");
         }
 
-        if (savedJobRepository.existsByUserIdAndJobId(currentUser.getId(), jobId)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Job already saved");
+        Optional<SavedJob> existing = savedJobRepository.findByUserIdAndJobId(currentUser.getId(), jobId);
+        if (existing.isPresent()) {
+            return toDto(existing.get());
         }
 
         Job job = jobRepository.findByIdAndDeletedAtIsNull(jobId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Job not found"));
 
         SavedJob savedJob = new SavedJob();
         savedJob.setUser(currentUser);
@@ -52,10 +58,23 @@ public class SavedJobService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only candidate can unsave jobs");
         }
 
-        SavedJob savedJob = savedJobRepository.findByUserIdAndJobId(currentUser.getId(), jobId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Saved job not found"));
+        savedJobRepository.findByUserIdAndJobId(currentUser.getId(), jobId)
+                .ifPresent(savedJobRepository::delete);
+    }
 
-        savedJobRepository.delete(savedJob);
+    public SavedJobDTO updateNote(Long jobId, SavedJobNoteRequest request) {
+        User currentUser = authContextService.requireCurrentUser();
+        if (currentUser.getRole() != User.Role.CANDIDATE) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only candidate can update saved job notes");
+        }
+
+        SavedJob savedJob = savedJobRepository.findByUserIdAndJobId(currentUser.getId(), jobId)
+                .orElseThrow(() -> new ResourceNotFoundException("Saved job not found"));
+
+        savedJob.setNote(request.getNote());
+        savedJob.setTag(request.getTag());
+
+        return toDto(savedJobRepository.save(savedJob));
     }
 
     public List<SavedJobDTO> getMySavedJobs() {
