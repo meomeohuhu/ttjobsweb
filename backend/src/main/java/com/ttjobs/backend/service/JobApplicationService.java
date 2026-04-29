@@ -1,21 +1,62 @@
 package com.ttjobs.backend.service;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import com.ttjobs.backend.entity.JobApplication;
-import com.ttjobs.backend.entity.User;
-import com.ttjobs.backend.entity.Job;
+import com.cloudinary.Cloudinary;
+import com.cloudinary.utils.ObjectUtils;
 import com.ttjobs.backend.dto.JobApplicationDTO;
+import com.ttjobs.backend.entity.CompanyMember;
+import com.ttjobs.backend.entity.Job;
+import com.ttjobs.backend.entity.JobApplication;
+import com.ttjobs.backend.entity.JobApplicationStatusAudit;
+import com.ttjobs.backend.entity.User;
+import com.ttjobs.backend.entity.UserCv;
 import com.ttjobs.backend.repository.JobApplicationRepository;
-import com.ttjobs.backend.repository.UserRepository;
+import com.ttjobs.backend.repository.JobApplicationStatusAuditRepository;
 import com.ttjobs.backend.repository.JobRepository;
+import com.ttjobs.backend.repository.UserCvRepository;
+import com.ttjobs.backend.repository.UserRepository;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
+
+import jakarta.servlet.http.HttpServletResponse;
 import java.time.LocalDateTime;
+import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 public class JobApplicationService {
+
+    private static final String SUBMITTED = "submitted";
+    private static final String REVIEWING = "reviewing";
+    private static final String SHORTLISTED = "shortlisted";
+    private static final String INTERVIEWED = "interviewed";
+    private static final String OFFERED = "offered";
+    private static final String HIRED = "hired";
+    private static final String REJECTED = "rejected";
+    private static final String WITHDRAWN = "withdrawn";
+
+    private static final Set<String> RECRUITER_STATUS = Set.of(
+            REVIEWING, SHORTLISTED, INTERVIEWED, OFFERED, HIRED, REJECTED
+    );
+    // CV limits and rules aligned with UserCvService.
+    private static final long MAX_CV_SIZE = 5L * 1024 * 1024;
+    private static final long STREAM_MAX_SIZE = 10L * 1024 * 1024;
+    private static final int DOWNLOAD_CONNECT_TIMEOUT_MS = 3000;
+    private static final int DOWNLOAD_READ_TIMEOUT_MS = 5000;
+    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    );
 
     @Autowired
     private JobApplicationRepository jobApplicationRepository;
@@ -26,54 +67,311 @@ public class JobApplicationService {
     @Autowired
     private JobRepository jobRepository;
 
+    @Autowired
+    private AuthContextService authContextService;
+
+    @Autowired
+    private CompanyAuthorizationService companyAuthorizationService;
+
+    @Autowired
+    private JobApplicationStatusAuditRepository statusAuditRepository;
+
+    @Autowired
+    private NotificationService notificationService;
+
+    @Autowired
+    private RecruiterActivityLogService recruiterActivityLogService;
+
+    @Autowired
+    private EmailService emailService;
+    @Autowired
+    private ObjectProvider<Cloudinary> cloudinaryProvider;
+    @Autowired
+    private CvTextExtractionService cvTextExtractionService;
+    @Autowired
+    private UserCvRepository userCvRepository;
+
     public List<JobApplicationDTO> getAllApplications() {
+        User currentUser = authContextService.requireCurrentUser();
+        if (!authContextService.isAdmin(currentUser)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only admin can access all applications");
+        }
+
         return jobApplicationRepository.findAll().stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
 
     public List<JobApplicationDTO> getApplicationsByUserId(Long userId) {
+        User currentUser = authContextService.requireCurrentUser();
+        if (!authContextService.isAdmin(currentUser) && !currentUser.getId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only view your applications");
+        }
+
         return jobApplicationRepository.findByUserId(userId).stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
 
+    public List<JobApplicationDTO> getMyApplications() {
+        User currentUser = authContextService.requireCurrentUser();
+        if (currentUser.getRole() != User.Role.CANDIDATE && !authContextService.isAdmin(currentUser)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only candidate can view applications");
+        }
+
+        return jobApplicationRepository.findByUserId(currentUser.getId()).stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
     public List<JobApplicationDTO> getApplicationsByJobId(Long jobId) {
+        User currentUser = authContextService.requireCurrentUser();
+
+        Job job = jobRepository.findByIdAndDeletedAtIsNull(jobId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
+
+        requireRecruiterOwnership(currentUser, job);
+
         return jobApplicationRepository.findByJobId(jobId).stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
 
-    public JobApplication applyForJob(Long userId, Long jobId) {
-        // Check if user already applied
-        Optional<JobApplication> existingApplication = jobApplicationRepository.findByUserIdAndJobId(userId, jobId);
-        if (existingApplication.isPresent()) {
-            throw new RuntimeException("User has already applied for this job");
+    // Recruiter gets applications for all owned jobs. Admin can see all.
+    public List<JobApplicationDTO> getApplicationsForMyJobs() {
+        User currentUser = authContextService.requireCurrentUser();
+
+        if (authContextService.isAdmin(currentUser)) {
+            return jobApplicationRepository.findAll().stream()
+                    .map(this::convertToDTO)
+                    .collect(Collectors.toList());
         }
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        Job job = jobRepository.findById(jobId)
-                .orElseThrow(() -> new RuntimeException("Job not found"));
+        if (currentUser.getRole() != User.Role.RECRUITER) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only recruiter can view recruiter applications");
+        }
+
+        List<Long> recruiterJobIds = jobRepository.findManagedJobsByRecruiterId(
+                        currentUser.getId(),
+                        List.of(CompanyMember.MemberRole.RECRUITER, CompanyMember.MemberRole.ADMIN)
+                ).stream()
+                .map(Job::getId)
+                .collect(Collectors.toList());
+
+        if (recruiterJobIds.isEmpty()) {
+            return List.of();
+        }
+
+        return jobApplicationRepository.findByJobIdIn(recruiterJobIds).stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    public JobApplicationDTO applyForJob(Long jobId, MultipartFile file, boolean useProfileCv, boolean saveToCvList) {
+        User currentUser = authContextService.requireCurrentUser();
+
+        if (currentUser.getRole() != User.Role.CANDIDATE) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only candidate can apply for jobs");
+        }
+        Optional<JobApplication> existingApplication = jobApplicationRepository.findByUserIdAndJobId(currentUser.getId(), jobId);
+        if (existingApplication.isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "User has already applied for this job");
+        }
+
+        User user = userRepository.findById(currentUser.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        Job job = jobRepository.findByIdAndDeletedAtIsNull(jobId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
+
+        if (!"open".equalsIgnoreCase(job.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Job is not open for application");
+        }
+
+        if (job.getApplicationDeadline() != null && LocalDateTime.now().isAfter(job.getApplicationDeadline())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Application deadline has passed");
+        }
 
         JobApplication application = new JobApplication();
         application.setUser(user);
         application.setJob(job);
         application.setApplicationDate(LocalDateTime.now());
-        application.setStatus("PENDING");
-
-        return jobApplicationRepository.save(application);
+        application.setStatus(SUBMITTED);
+        // Attach CV snapshot based on upload or saved CV list.
+        attachCvSnapshot(application, user, file, useProfileCv, saveToCvList);
+        JobApplication saved = jobApplicationRepository.save(application);
+        logStatusChange(saved, currentUser, null, SUBMITTED);
+        notificationService.createNotification(
+                user,
+                "Application submitted",
+                "You have successfully applied to " + job.getTitle(),
+                "APPLICATION_SUBMITTED"
+        );
+        // Send email to candidate after successful application.
+        emailService.sendApplicationSubmitted(user, job);
+        if (job.getCompany() != null && job.getCompany().getCreatedBy() != null) {
+            notificationService.createNotification(
+                    job.getCompany().getCreatedBy(),
+                    "New job application",
+                    user.getName() + " applied to " + job.getTitle(),
+                    "NEW_APPLICATION"
+            );
+            // Send email to company owner about the new application.
+            emailService.sendNewApplication(job.getCompany().getCreatedBy(), user, job);
+        }
+        return convertToDTO(saved);
     }
 
-    public JobApplication updateApplicationStatus(Long applicationId, String status) {
+    public void streamCv(Long applicationId, HttpServletResponse response) {
+        User currentUser = authContextService.requireCurrentUser();
+        JobApplication application = jobApplicationRepository.findByIdWithDetails(applicationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Application not found"));
+
+        requireRecruiterOwnership(currentUser, application.getJob());
+
+        if (application.getCvUrl() == null || application.getCvUrl().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No CV attached to this application");
+        }
+
+        recruiterActivityLogService.logCvViewed(currentUser, application);
+        streamFromUrl(application.getCvUrl(), application.getCvFileName(), response);
+    }
+
+    public JobApplicationDTO updateApplicationStatus(Long applicationId, String status) {
+        User currentUser = authContextService.requireCurrentUser();
+
         JobApplication application = jobApplicationRepository.findById(applicationId)
-                .orElseThrow(() -> new RuntimeException("Application not found"));
-        application.setStatus(status);
-        return jobApplicationRepository.save(application);
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Application not found"));
+
+        requireRecruiterOwnership(currentUser, application.getJob());
+
+        String targetStatus = normalizeStatus(status);
+        if (!RECRUITER_STATUS.contains(targetStatus)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Recruiter cannot set this status");
+        }
+
+        String currentStatus = normalizeStatus(application.getStatus());
+        validateApplicationTransition(currentStatus, targetStatus);
+        application.setStatus(targetStatus);
+        JobApplication saved = jobApplicationRepository.save(application);
+        logStatusChange(saved, currentUser, currentStatus, targetStatus);
+        recruiterActivityLogService.logApplicationStatusChanged(currentUser, saved, currentStatus, targetStatus);
+        notificationService.createNotification(
+                saved.getUser(),
+                "Application status updated",
+                "Your application for " + saved.getJob().getTitle() + " is now " + targetStatus,
+                "APPLICATION_STATUS_UPDATED"
+        );
+        return convertToDTO(saved);
     }
 
     public void deleteApplication(Long applicationId) {
-        jobApplicationRepository.deleteById(applicationId);
+        // Keep endpoint contract: DELETE acts as candidate withdraw, no hard delete.
+        withdrawApplication(applicationId);
+    }
+
+    public JobApplicationDTO withdrawApplication(Long applicationId) {
+        User currentUser = authContextService.requireCurrentUser();
+
+        JobApplication application = jobApplicationRepository.findById(applicationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Application not found"));
+
+        if (!currentUser.getId().equals(application.getUser().getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only withdraw your own application");
+        }
+
+        String currentStatus = normalizeStatus(application.getStatus());
+        if (isTerminal(currentStatus)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Terminal status cannot be changed");
+        }
+
+        application.setStatus(WITHDRAWN);
+        JobApplication saved = jobApplicationRepository.save(application);
+        logStatusChange(saved, currentUser, currentStatus, WITHDRAWN);
+        return convertToDTO(saved);
+    }
+
+    public List<com.ttjobs.backend.dto.ApplicationTimelineDTO> getApplicationTimeline(Long applicationId) {
+        User currentUser = authContextService.requireCurrentUser();
+        JobApplication application = jobApplicationRepository.findById(applicationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Application not found"));
+
+        if (!authContextService.isAdmin(currentUser)
+                && !currentUser.getId().equals(application.getUser().getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only view your own application timeline");
+        }
+
+        return statusAuditRepository.findByApplicationIdOrderByChangedAtAsc(applicationId)
+                .stream()
+                .map(audit -> {
+                    com.ttjobs.backend.dto.ApplicationTimelineDTO dto =
+                            new com.ttjobs.backend.dto.ApplicationTimelineDTO();
+                    dto.setFromStatus(audit.getFromStatus());
+                    dto.setToStatus(audit.getToStatus());
+                    dto.setChangedAt(audit.getChangedAt());
+                    return dto;
+                })
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    private String normalizeStatus(String status) {
+        if (status == null || status.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Status is required");
+        }
+        return status.trim().toLowerCase();
+    }
+
+    private boolean isTerminal(String status) {
+        return HIRED.equals(status) || REJECTED.equals(status) || WITHDRAWN.equals(status);
+    }
+
+    private void validateApplicationTransition(String currentStatus, String targetStatus) {
+        String from = normalizeStatus(currentStatus);
+
+        if (isTerminal(from)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Terminal status cannot be changed");
+        }
+
+        boolean valid = switch (from) {
+            case SUBMITTED -> targetStatus.equals(REVIEWING) || targetStatus.equals(REJECTED);
+            case REVIEWING -> targetStatus.equals(SHORTLISTED) || targetStatus.equals(INTERVIEWED) || targetStatus.equals(REJECTED);
+            case SHORTLISTED -> targetStatus.equals(INTERVIEWED) || targetStatus.equals(REJECTED);
+            case INTERVIEWED -> targetStatus.equals(OFFERED) || targetStatus.equals(REJECTED);
+            case OFFERED -> targetStatus.equals(HIRED) || targetStatus.equals(REJECTED);
+            default -> false;
+        };
+
+        if (!valid) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid application status transition");
+        }
+    }
+
+    private void requireRecruiterOwnership(User currentUser, Job job) {
+        if (authContextService.isAdmin(currentUser)) {
+            return;
+        }
+
+        if (currentUser.getRole() != User.Role.RECRUITER) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only recruiter can manage job applications");
+        }
+
+        if (job.getCompany() == null || job.getCompany().getDeletedAt() != null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not own this job");
+        }
+
+        if (!companyAuthorizationService.canManageCompany(currentUser, job.getCompany())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not own this job");
+        }
+    }
+
+    // Persist status transition for audit/debug/recruitment traceability.
+    private void logStatusChange(JobApplication application, User changedBy, String fromStatus, String toStatus) {
+        JobApplicationStatusAudit audit = new JobApplicationStatusAudit();
+        audit.setApplication(application);
+        audit.setChangedBy(changedBy);
+        audit.setFromStatus(fromStatus);
+        audit.setToStatus(toStatus);
+        audit.setChangedAt(LocalDateTime.now());
+        statusAuditRepository.save(audit);
     }
 
     private JobApplicationDTO convertToDTO(JobApplication application) {
@@ -81,6 +379,7 @@ public class JobApplicationService {
         dto.setId(application.getId());
         dto.setApplicationDate(application.getApplicationDate());
         dto.setStatus(application.getStatus());
+        dto.setHasCv(application.getCvUrl() != null && !application.getCvUrl().isBlank());
         if (application.getUser() != null) {
             dto.setUserId(application.getUser().getId());
             dto.setUserName(application.getUser().getName());
@@ -93,5 +392,193 @@ public class JobApplicationService {
             }
         }
         return dto;
+    }
+
+    private void attachCvSnapshot(JobApplication application, User user, MultipartFile file,
+                                  boolean useProfileCv, boolean saveToCvList) {
+        boolean hasFile = file != null && !file.isEmpty();
+        if (!hasFile && !useProfileCv) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Must provide a CV file or use profile CV");
+        }
+        if (hasFile && useProfileCv) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose either file upload or profile CV");
+        }
+        if (hasFile) {
+            validateCvFile(file);
+            Cloudinary cloudinary = requireCloudinary();
+            try {
+                Map<?, ?> result = cloudinary.uploader().upload(
+                        file.getBytes(),
+                        ObjectUtils.asMap(
+                                "folder", "ttjobs/cv/applications",
+                                "resource_type", "raw",
+                                "public_id", "app-" + user.getId() + "-" + System.currentTimeMillis(),
+                                "overwrite", true
+                        )
+                );
+                String cvUrl = (String) result.get("secure_url");
+                if (cvUrl == null || cvUrl.isBlank()) {
+                    throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Cloud upload failed");
+                }
+                application.setCvUrl(cvUrl);
+                application.setCvFileName(file.getOriginalFilename());
+
+                // Extract text for recommendation use.
+                String cvText = cvTextExtractionService.extractText(
+                        file.getBytes(),
+                        file.getContentType(),
+                        file.getOriginalFilename()
+                );
+                user.setCvText(cvText);
+                userRepository.save(user);
+
+                if (saveToCvList) {
+                    UserCv savedCv = saveUserCv(user, cvUrl, file.getOriginalFilename());
+                    application.setCv(savedCv);
+                }
+                return;
+            } catch (IOException e) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Cloud upload failed");
+            }
+        }
+
+        UserCv latestCv = userCvRepository.findTopByUserIdOrderByUploadedAtDesc(user.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "No profile CV found"));
+        application.setCvUrl(latestCv.getCvUrl());
+        application.setCvFileName(latestCv.getFileName());
+        application.setCv(latestCv);
+
+        if (user.getCvText() == null || user.getCvText().isBlank()) {
+            byte[] data = downloadCvBytes(latestCv.getCvUrl());
+            String cvText = cvTextExtractionService.extractText(data, null, latestCv.getFileName());
+            user.setCvText(cvText);
+            userRepository.save(user);
+        }
+    }
+
+    private void validateCvFile(MultipartFile file) {
+        if (file.getSize() > MAX_CV_SIZE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CV file size exceeds 5MB");
+        }
+        if (!ALLOWED_CONTENT_TYPES.contains(file.getContentType())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only PDF/DOC/DOCX files are allowed");
+        }
+    }
+
+    private Cloudinary requireCloudinary() {
+        Cloudinary cloudinary = cloudinaryProvider.getIfAvailable();
+        if (cloudinary == null) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Cloudinary is not configured");
+        }
+        return cloudinary;
+    }
+
+    private UserCv saveUserCv(User user, String cvUrl, String fileName) {
+        UserCv userCv = new UserCv();
+        userCv.setUser(user);
+        userCv.setCvUrl(cvUrl);
+        userCv.setFileName(fileName);
+        return userCvRepository.save(userCv);
+    }
+
+    private void streamFromUrl(String cvUrl, String fileName, HttpServletResponse response) {
+        try {
+            java.net.URLConnection connection = new java.net.URL(cvUrl).openConnection();
+            connection.setConnectTimeout(DOWNLOAD_CONNECT_TIMEOUT_MS);
+            connection.setReadTimeout(DOWNLOAD_READ_TIMEOUT_MS);
+            String contentType = inferCvContentType(fileName, connection.getContentType());
+            if (contentType == null || contentType.isBlank()) {
+                contentType = "application/octet-stream";
+            }
+            response.setContentType(contentType);
+            String safeName = sanitizeCvDownloadName(fileName, contentType);
+            response.setHeader("Content-Disposition", buildInlineDisposition(safeName));
+
+            try (java.io.InputStream input = connection.getInputStream();
+                 java.io.OutputStream output = response.getOutputStream()) {
+                byte[] buffer = new byte[8192];
+                int read;
+                long total = 0;
+                while ((read = input.read(buffer)) != -1) {
+                    total += read;
+                    if (total > STREAM_MAX_SIZE) {
+                        throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "CV file size exceeds 10MB");
+                    }
+                    output.write(buffer, 0, read);
+                }
+                output.flush();
+            }
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to stream CV");
+        }
+    }
+
+    private String buildInlineDisposition(String fileName) {
+        String encoded = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20");
+        return "inline; filename=\"" + fileName.replace("\"", "") + "\"; filename*=UTF-8''" + encoded;
+    }
+
+    private String sanitizeCvDownloadName(String fileName, String contentType) {
+        String safeName = (fileName == null || fileName.isBlank()) ? "cv" : fileName.trim();
+        if (!safeName.contains(".")) {
+            safeName = safeName + guessCvExtension(contentType);
+        }
+        return safeName.replace("\r", "").replace("\n", "");
+    }
+
+    private String inferCvContentType(String fileName, String fallbackContentType) {
+        String lowerName = fileName == null ? "" : fileName.toLowerCase();
+        if (lowerName.endsWith(".pdf")) {
+            return "application/pdf";
+        }
+        if (lowerName.endsWith(".doc")) {
+            return "application/msword";
+        }
+        if (lowerName.endsWith(".docx")) {
+            return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        }
+        return fallbackContentType;
+    }
+
+    private String guessCvExtension(String contentType) {
+        String type = contentType == null ? "" : contentType.toLowerCase();
+        if (type.contains("pdf")) {
+            return ".pdf";
+        }
+        if (type.contains("officedocument.wordprocessingml.document")) {
+            return ".docx";
+        }
+        if (type.contains("msword")) {
+            return ".doc";
+        }
+        return ".pdf";
+    }
+
+    private byte[] downloadCvBytes(String cvUrl) {
+        try {
+            java.net.URLConnection connection = new java.net.URL(cvUrl).openConnection();
+            connection.setConnectTimeout(DOWNLOAD_CONNECT_TIMEOUT_MS);
+            connection.setReadTimeout(DOWNLOAD_READ_TIMEOUT_MS);
+            try (java.io.InputStream input = connection.getInputStream()) {
+                return readLimited(input, MAX_CV_SIZE);
+            }
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to download CV");
+        }
+    }
+
+    private byte[] readLimited(java.io.InputStream input, long maxBytes) throws IOException {
+        java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
+        byte[] buffer = new byte[4096];
+        int read;
+        long total = 0;
+        while ((read = input.read(buffer)) != -1) {
+            total += read;
+            if (total > maxBytes) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CV file size exceeds 5MB");
+            }
+            output.write(buffer, 0, read);
+        }
+        return output.toByteArray();
     }
 }
