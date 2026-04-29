@@ -160,6 +160,36 @@ class RecommendationServiceTest {
 
         assertEquals(1, result.size());
         assertEquals("Backend Engineer", result.get(0).getTitle());
+        assertEquals(82, result.get(0).getMatchScore());
+        assertEquals(true, result.get(0).getMatchReasons().contains("Trùng vị trí mong muốn"));
+    }
+
+    @Test
+    void recommendByJobNeeds_shouldAllowRecruiterPreferences() {
+        User recruiter = new User();
+        recruiter.setId(6L);
+        recruiter.setRole(User.Role.RECRUITER);
+
+        JobNeedPreference preference = new JobNeedPreference();
+        preference.setUserId(6L);
+        preference.setDesiredCategory("SALES");
+
+        Job job = new Job();
+        job.setId(31L);
+        job.setTitle("Sales Executive");
+        job.setStatus("open");
+        job.setCategory("SALES");
+
+        when(authContextService.requireCurrentUser()).thenReturn(recruiter);
+        when(jobNeedPreferenceService.getOrCreate(6L)).thenReturn(preference);
+        when(jobNeedPreferenceService.hasConfiguredCriteria(preference)).thenReturn(true);
+        when(jobRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(List.of(job)));
+
+        List<JobDTO> result = recommendationService.recommendByJobNeeds();
+
+        assertEquals(1, result.size());
+        assertEquals("Sales Executive", result.get(0).getTitle());
     }
 
 }

@@ -128,12 +128,13 @@ public class ConversationService {
         }
         long unreadCount = 0L;
         long unreadByOthersCount = 0L;
+        LocalDateTime unreadFallback = LocalDateTime.of(1970, 1, 1, 0, 0);
         LocalDateTime myLastReadAt = myMembership == null ? null : myMembership.getLastReadAt();
-        if (myLastReadAt != null && messageRepository != null) {
+        if (myMembership != null && messageRepository != null) {
             unreadCount = messageRepository.countByConversationIdAndSenderIdNotAndCreatedAtAfter(
                     conversation.getId(),
                     myMembership.getId().getUserId(),
-                    myLastReadAt
+                    myLastReadAt == null ? unreadFallback : myLastReadAt
             );
         }
 
@@ -143,11 +144,11 @@ public class ConversationService {
                 .orElse(null);
         if (otherMember != null && lastMessage != null && myMembership != null) {
             LocalDateTime otherLastReadAt = otherMember.getLastReadAt();
-            if (otherLastReadAt != null && messageRepository != null) {
+            if (messageRepository != null) {
                 unreadByOthersCount = messageRepository.countByConversationIdAndSenderIdAndCreatedAtAfter(
                         conversation.getId(),
                         myMembership.getId().getUserId(),
-                        otherLastReadAt
+                        otherLastReadAt == null ? unreadFallback : otherLastReadAt
                 );
             }
         }

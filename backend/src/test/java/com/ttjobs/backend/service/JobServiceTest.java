@@ -5,12 +5,16 @@ import com.ttjobs.backend.entity.Job;
 import com.ttjobs.backend.entity.User;
 import com.ttjobs.backend.repository.CompanyMemberRepository;
 import com.ttjobs.backend.repository.CompanyRepository;
+import com.ttjobs.backend.repository.JobCategoryCount;
 import com.ttjobs.backend.repository.JobRepository;
+import com.ttjobs.backend.repository.JobWithSavedCount;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Optional;
@@ -18,8 +22,11 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -171,6 +178,94 @@ class JobServiceTest {
         doNothing().when(companyAuthorizationService).requireManageCompany(recruiter, company);
 
         assertEquals(1, jobService.getCompanyJobs(5L).size());
+    }
+
+    @Test
+    void getHighlightedJobs_shouldClampSizeAndMapSavedCount() {
+        Company company = new Company();
+        company.setId(7L);
+        company.setName("FPT Software");
+
+        Job job = new Job();
+        job.setId(20L);
+        job.setTitle("Java Backend Developer");
+        job.setStatus("open");
+        job.setCompany(company);
+
+        JobWithSavedCount projection = mock(JobWithSavedCount.class);
+        when(projection.getJob()).thenReturn(job);
+        when(projection.getSavedCount()).thenReturn(9L);
+        when(jobRepository.findHighlightedJobs(eq("open"), any(Pageable.class))).thenReturn(List.of(projection));
+
+        List<com.ttjobs.backend.dto.JobDTO> result = jobService.getHighlightedJobs(null, 100);
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        org.mockito.Mockito.verify(jobRepository).findHighlightedJobs(eq("open"), pageableCaptor.capture());
+        assertEquals(50, pageableCaptor.getValue().getPageSize());
+        assertEquals(1, result.size());
+        assertEquals(20L, result.get(0).getId());
+        assertEquals(9L, result.get(0).getSavedCount());
+    }
+
+    @Test
+    void getHighlightedJobs_shouldRejectUnknownType() {
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> jobService.getHighlightedJobs("paid_boost", 12));
+
+        assertEquals(400, ex.getStatusCode().value());
+    }
+
+    @Test
+    void getBestJobs_shouldClampSizeAndMapSavedCount() {
+        Company company = new Company();
+        company.setId(8L);
+        company.setName("TTJobs");
+
+        Job job = new Job();
+        job.setId(21L);
+        job.setTitle("Most Saved");
+        job.setStatus("open");
+        job.setCompany(company);
+
+        JobWithSavedCount projection = mock(JobWithSavedCount.class);
+        when(projection.getJob()).thenReturn(job);
+        when(projection.getSavedCount()).thenReturn(14L);
+        when(jobRepository.findBestJobs(eq("open"), any(Pageable.class))).thenReturn(List.of(projection));
+
+        List<com.ttjobs.backend.dto.JobDTO> result = jobService.getBestJobs(null, 100);
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        org.mockito.Mockito.verify(jobRepository).findBestJobs(eq("open"), pageableCaptor.capture());
+        assertEquals(50, pageableCaptor.getValue().getPageSize());
+        assertEquals(1, result.size());
+        assertEquals(21L, result.get(0).getId());
+        assertEquals(14L, result.get(0).getSavedCount());
+    }
+
+    @Test
+    void getBestJobs_shouldRejectUnknownType() {
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> jobService.getBestJobs("newest", 12));
+
+        assertEquals(400, ex.getStatusCode().value());
+    }
+
+    @Test
+    void getTopCategories_shouldClampSizeAndResolveLabel() {
+        JobCategoryCount projection = mock(JobCategoryCount.class);
+        when(projection.getCategory()).thenReturn("SALES");
+        when(projection.getJobCount()).thenReturn(7L);
+        when(jobRepository.findTopCategories(eq("open"), any(Pageable.class))).thenReturn(List.of(projection));
+
+        List<com.ttjobs.backend.dto.JobCategoryStatDTO> result = jobService.getTopCategories(100);
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        org.mockito.Mockito.verify(jobRepository).findTopCategories(eq("open"), pageableCaptor.capture());
+        assertEquals(24, pageableCaptor.getValue().getPageSize());
+        assertEquals(1, result.size());
+        assertEquals("SALES", result.get(0).getCategory());
+        assertEquals("Kinh doanh - Bán hàng", result.get(0).getLabel());
+        assertEquals(7L, result.get(0).getJobCount());
     }
 
     private User user(Long id, User.Role role) {

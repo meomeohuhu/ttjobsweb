@@ -1,6 +1,7 @@
 package com.ttjobs.backend.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ttjobs.backend.dto.JobCategoryStatDTO;
 import com.ttjobs.backend.dto.JobDTO;
 import com.ttjobs.backend.entity.Company;
 import com.ttjobs.backend.entity.Job;
@@ -64,8 +65,8 @@ class JobControllerApiTest {
         dto.setTitle("Backend Engineer");
         dto.setStatus("open");
 
-        when(jobService.searchJobs(eq("Backend"), eq("HCM"), eq(null), eq("full_time"),
-                eq("mid"), eq("open"), eq(null), eq(null), eq(null), eq(0), eq(20)))
+        when(jobService.searchJobs(eq("Backend"), eq(null), eq("HCM"), eq(null), eq("full_time"),
+                eq("mid"), eq("open"), eq(null), eq(null), eq(null), eq("latest"), eq(0), eq(20)))
                 .thenReturn(List.of(dto));
 
         mockMvc.perform(get("/api/jobs/search")
@@ -82,10 +83,84 @@ class JobControllerApiTest {
     }
 
     @Test
+    void getJobs_shouldApplyQueryFilters() throws Exception {
+        JobDTO dto = new JobDTO();
+        dto.setId(3L);
+        dto.setTitle("Filtered Job");
+        dto.setStatus("open");
+
+        when(jobService.getPublicJobs(eq("Java"), eq("INFORMATION-TECHNOLOGY"), eq("Ha Noi"),
+                eq(null), eq("full_time"), eq("senior"), eq(BigDecimal.valueOf(10000000)),
+                eq(BigDecimal.valueOf(30000000)), eq("salary_high"), eq(0), eq(60)))
+                .thenReturn(List.of(dto));
+
+        mockMvc.perform(get("/api/jobs")
+                        .param("keyword", "Java")
+                        .param("category", "INFORMATION-TECHNOLOGY")
+                        .param("location", "Ha Noi")
+                        .param("jobType", "full_time")
+                        .param("experienceLevel", "senior")
+                        .param("salaryMin", "10000000")
+                        .param("salaryMax", "30000000")
+                        .param("sort", "salary_high")
+                        .param("page", "0")
+                        .param("size", "60"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(3))
+                .andExpect(jsonPath("$[0].title").value("Filtered Job"));
+    }
+
+    @Test
     void searchJobs_shouldReturnBadRequest_whenSizeOutOfRange() throws Exception {
         mockMvc.perform(get("/api/jobs/search")
                         .param("size", "200"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getHighlightedJobs_shouldReturnList() throws Exception {
+        JobDTO dto = new JobDTO();
+        dto.setId(5L);
+        dto.setTitle("High Salary Job");
+        dto.setStatus("open");
+        dto.setSavedCount(3L);
+
+        when(jobService.getHighlightedJobs(eq("high_salary"), eq(12))).thenReturn(List.of(dto));
+
+        mockMvc.perform(get("/api/jobs/highlights"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(5))
+                .andExpect(jsonPath("$[0].title").value("High Salary Job"))
+                .andExpect(jsonPath("$[0].savedCount").value(3));
+    }
+
+    @Test
+    void getBestJobs_shouldReturnList() throws Exception {
+        JobDTO dto = new JobDTO();
+        dto.setId(6L);
+        dto.setTitle("Most Saved Job");
+        dto.setStatus("open");
+        dto.setSavedCount(12L);
+
+        when(jobService.getBestJobs(eq("most_saved"), eq(12))).thenReturn(List.of(dto));
+
+        mockMvc.perform(get("/api/jobs/best"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(6))
+                .andExpect(jsonPath("$[0].title").value("Most Saved Job"))
+                .andExpect(jsonPath("$[0].savedCount").value(12));
+    }
+
+    @Test
+    void getTopCategories_shouldReturnList() throws Exception {
+        when(jobService.getTopCategories(eq(8)))
+                .thenReturn(List.of(new JobCategoryStatDTO("SALES", "Kinh doanh - Bán hàng", 5L)));
+
+        mockMvc.perform(get("/api/jobs/categories/top"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].category").value("SALES"))
+                .andExpect(jsonPath("$[0].label").value("Kinh doanh - Bán hàng"))
+                .andExpect(jsonPath("$[0].jobCount").value(5));
     }
 
     @Test

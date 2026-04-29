@@ -3,6 +3,7 @@ package com.ttjobs.backend.dto;
 import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class JobDTO {
@@ -25,4 +26,6 @@ public class JobDTO {
     private String companyName;
     private String companyLogoUrl;
     private Long savedCount;
+    private Integer matchScore;
+    private List<String> matchReasons;
 }
