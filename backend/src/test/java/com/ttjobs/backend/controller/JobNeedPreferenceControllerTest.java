@@ -53,6 +53,8 @@ class JobNeedPreferenceControllerTest {
                                   "desiredTitle": "Backend Engineer",
                                   "minSalary": 15000000,
                                   "maxSalary": 30000000,
+                                  "preferredSkills": ["Java", "Spring Boot"],
+                                  "excludedKeywords": ["Intern"],
                                   "remoteOnly": true
                                 }
                                 """))

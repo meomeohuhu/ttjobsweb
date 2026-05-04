@@ -68,6 +68,12 @@ public class User {
     private PrimaryCvType primaryCvType;
 
     private String avatarUrl;
+    private String mbtiType;
+    private LocalDateTime mbtiTakenAt;
+    @Column(columnDefinition = "TEXT")
+    private String miScoresJson;
+    private LocalDateTime miTakenAt;
+    private Boolean personalityPublic = false;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     

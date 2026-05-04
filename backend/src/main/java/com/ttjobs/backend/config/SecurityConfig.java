@@ -46,8 +46,12 @@ public class SecurityConfig {
                         "/api/companies/top-saved-jobs",
                         "/api/companies/*",
                         "/api/companies/*/jobs",
-                        "/api/companies/*/public-page").permitAll()
+                        "/api/companies/*/public-page",
+                        "/api/companies/*/follow-status").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/career-guides/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/skills").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/tools/salary-benchmark").permitAll()
+                .requestMatchers("/api/tools/sessions/**").authenticated()
                 // Authenticated company follow actions.
                 .requestMatchers("/api/company-follows/**").authenticated()
                 .requestMatchers("/api/job-needs/**").authenticated()

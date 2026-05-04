@@ -1,6 +1,8 @@
 package com.ttjobs.backend.service;
 
 import com.ttjobs.backend.dto.ApplicationTimelineDTO;
+import com.ttjobs.backend.dto.AiCvScoreDTO;
+import com.ttjobs.backend.dto.AiCvScoreRequest;
 import com.ttjobs.backend.dto.CandidateSearchDTO;
 import com.ttjobs.backend.dto.InterviewScheduleDTO;
 import com.ttjobs.backend.dto.InterviewScheduleRequest;
@@ -13,6 +15,7 @@ import com.ttjobs.backend.dto.RecruitmentCampaignDTO;
 import com.ttjobs.backend.dto.RecruitmentCampaignRequest;
 import com.ttjobs.backend.entity.Company;
 import com.ttjobs.backend.entity.CompanyMember;
+import com.ttjobs.backend.entity.ApplicationAiScore;
 import com.ttjobs.backend.entity.InterviewSchedule;
 import com.ttjobs.backend.entity.Job;
 import com.ttjobs.backend.entity.JobApplication;
@@ -22,6 +25,7 @@ import com.ttjobs.backend.entity.User;
 import com.ttjobs.backend.repository.CompanyFollowRepository;
 import com.ttjobs.backend.repository.CompanyMemberRepository;
 import com.ttjobs.backend.repository.CompanyRepository;
+import com.ttjobs.backend.repository.ApplicationAiScoreRepository;
 import com.ttjobs.backend.repository.InterviewScheduleRepository;
 import com.ttjobs.backend.repository.JobApplicationRepository;
 import com.ttjobs.backend.repository.JobApplicationStatusAuditRepository;
@@ -30,11 +34,21 @@ import com.ttjobs.backend.repository.RecruitmentCampaignRepository;
 import com.ttjobs.backend.repository.SavedJobRepository;
 import com.ttjobs.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.RequestEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -69,9 +83,18 @@ public class RecruiterWorkspaceService {
     @Autowired
     private InterviewScheduleRepository interviewScheduleRepository;
     @Autowired
+    private EmailService emailService;
+    @Autowired
     private RecruitmentCampaignRepository campaignRepository;
     @Autowired
     private UserRepository userRepository;
+    @Autowired
+    private ApplicationAiScoreRepository applicationAiScoreRepository;
+    @Autowired
+    private RestTemplate restTemplate;
+
+    @Value("${ttjobs.ai.base-url}")
+    private String aiBaseUrl;
 
     public List<RecruiterCompanyDTO> getManagedCompanies() {
         User currentUser = requireRecruiterOrAdmin();
@@ -121,12 +144,44 @@ public class RecruiterWorkspaceService {
                 .toList(), page, size);
     }
 
+    @Transactional
+    public List<RecruiterApplicationDTO> screenManagedApplications(Long companyId, Long jobId, String status,
+                                                                   String keyword, Integer minScore,
+                                                                   Integer page, Integer size,
+                                                                   Boolean refresh) {
+        User currentUser = requireRecruiterOrAdmin();
+        int safeMinScore = minScore == null ? 0 : Math.max(0, Math.min(100, minScore));
+        return paginate(loadManagedApplications(currentUser).stream()
+                .filter(application -> companyId == null || companyId.equals(applicationCompanyId(application)))
+                .filter(application -> jobId == null || jobId.equals(applicationJobId(application)))
+                .filter(application -> isBlank(status) || status.equalsIgnoreCase(application.getStatus()))
+                .filter(application -> matchesApplicationKeyword(application, keyword))
+                .map(application -> ensureAiScore(application, Boolean.TRUE.equals(refresh)))
+                .filter(Objects::nonNull)
+                .filter(application -> applicationScore(application) >= safeMinScore)
+                .sorted(Comparator.comparing(this::applicationScore).reversed()
+                        .thenComparing(JobApplication::getApplicationDate, Comparator.nullsLast(Comparator.reverseOrder())))
+                .map(this::toApplicationDto)
+                .toList(), page, size);
+    }
+
     public RecruiterApplicationDetailDTO getManagedApplicationDetail(Long applicationId) {
         User currentUser = requireRecruiterOrAdmin();
         JobApplication application = jobApplicationRepository.findByIdWithDetails(applicationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Application not found"));
 
         requireApplicationAccess(currentUser, application);
+        return toApplicationDetailDto(application);
+    }
+
+    @Transactional
+    public RecruiterApplicationDetailDTO scoreManagedApplication(Long applicationId, Boolean refresh) {
+        User currentUser = requireRecruiterOrAdmin();
+        JobApplication application = jobApplicationRepository.findByIdWithDetails(applicationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Application not found"));
+
+        requireApplicationAccess(currentUser, application);
+        ensureAiScore(application, Boolean.TRUE.equals(refresh));
         return toApplicationDetailDto(application);
     }
 
@@ -224,7 +279,9 @@ public class RecruiterWorkspaceService {
         interview.setMeetingLink(request.getMeetingLink());
         interview.setNote(request.getNote());
         interview.setStatus(isBlank(request.getStatus()) ? "pending" : request.getStatus());
-        return toInterviewDto(interviewScheduleRepository.save(interview));
+        InterviewSchedule saved = interviewScheduleRepository.save(interview);
+        emailService.sendInterviewCreated(saved.getCandidate(), saved);
+        return toInterviewDto(saved);
     }
 
     public InterviewScheduleDTO updateInterviewStatus(Long interviewId, String status) {
@@ -433,6 +490,7 @@ public class RecruiterWorkspaceService {
             }
         }
         dto.setHasCv(hasCv(application));
+        attachAiScore(dto, application);
         return dto;
     }
 
@@ -459,6 +517,7 @@ public class RecruiterWorkspaceService {
             }
         }
         dto.setHasCv(hasCv(application));
+        attachAiScore(dto, application);
         dto.setTimeline(statusAuditRepository.findByApplicationIdOrderByChangedAtAsc(application.getId())
                 .stream()
                 .map(this::toTimelineDto)
@@ -525,7 +584,7 @@ public class RecruiterWorkspaceService {
         dto.setStartsAt(campaign.getStartsAt());
         dto.setEndsAt(campaign.getEndsAt());
         dto.setJobCount((long) (campaign.getJobs() == null ? 0 : campaign.getJobs().size()));
-        dto.setApplicationCount((long) (campaign.getApplications() == null ? 0 : campaign.getApplications().size()));
+        dto.setApplicationCount(campaign.getId() == null ? 0L : campaignRepository.countApplicationsByCampaignId(campaign.getId()));
         dto.setJobIds(campaign.getJobs() == null ? List.of() : campaign.getJobs().stream().map(Job::getId).toList());
         dto.setCreatedAt(campaign.getCreatedAt());
         return dto;
@@ -573,7 +632,164 @@ public class RecruiterWorkspaceService {
     }
 
     private boolean hasCv(JobApplication application) {
-        return application.getCvUrl() != null && !application.getCvUrl().isBlank();
+        return !isBlank(application.getCvUrl()) || !isBlank(application.getCvTextSnapshot());
+    }
+
+    private void attachAiScore(RecruiterApplicationDTO dto, JobApplication application) {
+        applicationAiScoreRepository.findByApplicationId(application.getId()).ifPresent(score -> {
+            dto.setAiScore(score.getScore());
+            dto.setAiLevel(score.getLevel());
+            dto.setAiScoredAt(score.getScoredAt());
+            dto.setAiScoreAvailable(true);
+        });
+    }
+
+    private void attachAiScore(RecruiterApplicationDetailDTO dto, JobApplication application) {
+        applicationAiScoreRepository.findByApplicationId(application.getId()).ifPresent(score -> {
+            dto.setAiScore(score.getScore());
+            dto.setAiLevel(score.getLevel());
+            dto.setAiRawScore(score.getRawScore());
+            dto.setAiSignals(deserializeSignals(score.getSignals()));
+            dto.setAiScoredAt(score.getScoredAt());
+            dto.setAiScoreAvailable(true);
+        });
+    }
+
+    private JobApplication ensureAiScore(JobApplication application, boolean refresh) {
+        String cvText = resolveCvText(application);
+        String jobText = buildJobText(application.getJob());
+        if (isBlank(cvText) || isBlank(jobText)) {
+            return application;
+        }
+
+        String cvHash = sha256(cvText);
+        String jobHash = sha256(jobText);
+        ApplicationAiScore existing = applicationAiScoreRepository.findByApplicationId(application.getId()).orElse(null);
+        if (!refresh && existing != null
+                && cvHash.equals(existing.getCvHash())
+                && jobHash.equals(existing.getJobHash())) {
+            return application;
+        }
+
+        AiCvScoreDTO aiScore = fetchCvScore(cvText, jobText);
+        if (aiScore == null || aiScore.getScore() == null) {
+            return application;
+        }
+
+        ApplicationAiScore entity = existing == null ? new ApplicationAiScore() : existing;
+        entity.setApplication(application);
+        entity.setScore(Math.max(1, Math.min(100, aiScore.getScore())));
+        entity.setLevel(isBlank(aiScore.getLevel()) ? "possible_match" : aiScore.getLevel());
+        entity.setRawScore(aiScore.getRawScore());
+        entity.setSignals(serializeSignals(aiScore.getSignals()));
+        entity.setCvHash(cvHash);
+        entity.setJobHash(jobHash);
+        entity.setScoredAt(LocalDateTime.now());
+        applicationAiScoreRepository.save(entity);
+        return application;
+    }
+
+    private AiCvScoreDTO fetchCvScore(String cvText, String jobText) {
+        try {
+            AiCvScoreRequest request = new AiCvScoreRequest();
+            request.setCvText(cvText);
+            request.setJobText(jobText);
+
+            RequestEntity<AiCvScoreRequest> entity = RequestEntity
+                    .post(aiBaseUrl + "/ai/score-cv")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(request);
+
+            return restTemplate.exchange(entity, AiCvScoreDTO.class).getBody();
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    private String resolveCvText(JobApplication application) {
+        if (!isBlank(application.getCvTextSnapshot())) {
+            return application.getCvTextSnapshot();
+        }
+        if (application.getUser() != null && !isBlank(application.getUser().getCvText())) {
+            return application.getUser().getCvText();
+        }
+        if (application.getUser() == null) {
+            return null;
+        }
+        return String.join("\n",
+                Objects.requireNonNullElse(application.getUser().getCvRole(), ""),
+                Objects.requireNonNullElse(application.getUser().getCvObjective(), ""),
+                Objects.requireNonNullElse(application.getUser().getCvExperienceHighlights(), ""),
+                application.getUser().getSkills() == null ? "" : application.getUser().getSkills().stream()
+                        .map(skill -> skill.getName())
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.joining(", "))
+        );
+    }
+
+    private String buildJobText(Job job) {
+        if (job == null) {
+            return null;
+        }
+        List<String> parts = new ArrayList<>();
+        parts.add(job.getTitle());
+        parts.add(job.getDescription());
+        parts.add(job.getCategory());
+        parts.add(job.getExperienceLevel());
+        parts.add(job.getJobType());
+        parts.add(job.getLocation());
+        if (job.getCompany() != null) {
+            parts.add(job.getCompany().getName());
+            parts.add(job.getCompany().getIndustry());
+        }
+        if (job.getSkills() != null) {
+            parts.add(job.getSkills().stream()
+                    .map(skill -> skill.getName())
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.joining(", ")));
+        }
+        return parts.stream()
+                .filter(part -> part != null && !part.isBlank())
+                .collect(Collectors.joining("\n"));
+    }
+
+    private int applicationScore(JobApplication application) {
+        return applicationAiScoreRepository.findByApplicationId(application.getId())
+                .map(ApplicationAiScore::getScore)
+                .orElse(0);
+    }
+
+    private String serializeSignals(List<String> signals) {
+        if (signals == null || signals.isEmpty()) {
+            return null;
+        }
+        return signals.stream()
+                .filter(signal -> signal != null && !signal.isBlank())
+                .collect(Collectors.joining("\n"));
+    }
+
+    private List<String> deserializeSignals(String signals) {
+        if (isBlank(signals)) {
+            return List.of();
+        }
+        return Arrays.stream(signals.split("\\R"))
+                .map(String::trim)
+                .filter(signal -> !signal.isBlank())
+                .toList();
+    }
+
+    private String sha256(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] bytes = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder builder = new StringBuilder();
+            for (byte item : bytes) {
+                builder.append(String.format("%02x", item));
+            }
+            return builder.toString();
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 is unavailable", ex);
+        }
     }
 
     private boolean contains(String text, String normalizedNeedle) {

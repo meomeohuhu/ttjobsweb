@@ -4,6 +4,7 @@ import jakarta.validation.constraints.DecimalMin;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Data
 public class JobNeedPreferenceRequest {
@@ -20,5 +21,7 @@ public class JobNeedPreferenceRequest {
     @DecimalMin(value = "0.0", inclusive = true)
     private BigDecimal maxSalary;
 
+    private List<String> preferredSkills;
+    private List<String> excludedKeywords;
     private Boolean remoteOnly;
 }

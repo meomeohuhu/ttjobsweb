@@ -55,7 +55,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                         "http://127.0.0.1:5176",
                         "http://127.0.0.1:5190",
                         "http://localhost:3000"
-                );
+                )
+                .withSockJS();
     }
 
     @Override

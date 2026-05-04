@@ -9,6 +9,9 @@ import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
@@ -23,21 +26,76 @@ public final class JobSpecifications {
             Join<Job, Company> company = root.join("company", JoinType.INNER);
             return cb.and(
                     cb.isNull(root.get("deletedAt")),
-                    cb.isNull(company.get("deletedAt"))
+                    cb.isNull(company.get("deletedAt")),
+                    cb.or(
+                            cb.isNull(root.get("applicationDeadline")),
+                            cb.greaterThanOrEqualTo(root.get("applicationDeadline"), LocalDateTime.now())
+                    )
             );
         };
     }
 
     public static Specification<Job> keywordLike(String keyword) {
         return (root, query, cb) -> {
-            String pattern = "%" + keyword.toLowerCase(Locale.ROOT) + "%";
+            List<String> tokens = tokenize(keyword);
+            if (tokens.isEmpty()) {
+                return cb.conjunction();
+            }
+
+            query.distinct(true);
             Join<Job, Company> company = root.join("company", JoinType.LEFT);
-            return cb.or(
-                    cb.like(cb.lower(root.get("title")), pattern),
-                    cb.like(cb.lower(root.get("description")), pattern),
-                    cb.like(cb.lower(company.get("name")), pattern)
-            );
+            Join<Job, Skill> skill = root.join("skills", JoinType.LEFT);
+            List<Predicate> tokenPredicates = new ArrayList<>();
+
+            for (String token : tokens) {
+                String pattern = "%" + token + "%";
+                tokenPredicates.add(cb.or(
+                        cb.like(cb.lower(root.get("title")), pattern),
+                        cb.like(cb.lower(root.get("description")), pattern),
+                        cb.like(cb.lower(root.get("category")), pattern),
+                        cb.like(cb.lower(company.get("name")), pattern),
+                        cb.like(cb.lower(company.get("description")), pattern),
+                        cb.like(cb.lower(company.get("location")), pattern),
+                        cb.like(cb.lower(company.get("industry")), pattern),
+                        cb.like(cb.lower(skill.get("name")), pattern)
+                ));
+            }
+
+            return cb.and(tokenPredicates.toArray(Predicate[]::new));
         };
+    }
+
+    public static Specification<Job> keywordNotLike(List<String> keywords) {
+        return (root, query, cb) -> {
+            if (keywords == null || keywords.isEmpty()) {
+                return cb.conjunction();
+            }
+
+            Join<Job, Company> company = root.join("company", JoinType.LEFT);
+            List<Predicate> predicates = keywords.stream()
+                    .filter(keyword -> keyword != null && !keyword.isBlank())
+                    .map(keyword -> "%" + keyword.trim().toLowerCase(Locale.ROOT) + "%")
+                    .map(pattern -> cb.not(cb.or(
+                            cb.like(cb.lower(root.get("title")), pattern),
+                            cb.like(cb.lower(root.get("description")), pattern),
+                            cb.like(cb.lower(company.get("name")), pattern)
+                    )))
+                    .toList();
+
+            if (predicates.isEmpty()) {
+                return cb.conjunction();
+            }
+            return cb.and(predicates.toArray(Predicate[]::new));
+        };
+    }
+
+    private static List<String> tokenize(String value) {
+        if (value == null || value.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(value.trim().toLowerCase(Locale.ROOT).split("\\s+"))
+                .filter(token -> !token.isBlank())
+                .toList();
     }
 
     public static Specification<Job> locationLike(String location) {
@@ -62,6 +120,15 @@ public final class JobSpecifications {
 
     public static Specification<Job> statusEquals(String status) {
         return (root, query, cb) -> cb.equal(root.get("status"), status);
+    }
+
+    public static Specification<Job> postedSince(LocalDateTime cutoff) {
+        return (root, query, cb) -> {
+            if (cutoff == null) {
+                return cb.conjunction();
+            }
+            return cb.greaterThanOrEqualTo(root.get("postedDate"), cutoff);
+        };
     }
 
     public static Specification<Job> salaryMinGte(BigDecimal min) {
@@ -112,6 +179,21 @@ public final class JobSpecifications {
                     cb.like(cb.lower(root.get("location")), online),
                     cb.like(cb.lower(root.get("description")), remote),
                     cb.like(cb.lower(root.get("description")), hybrid)
+            );
+        };
+    }
+
+    public static Specification<Job> nonRemote() {
+        return (root, query, cb) -> {
+            String remote = "%remote%";
+            String online = "%online%";
+            String hybrid = "%hybrid%";
+            return cb.and(
+                    cb.notLike(cb.lower(root.get("location")), remote),
+                    cb.notLike(cb.lower(root.get("location")), online),
+                    cb.notLike(cb.lower(root.get("location")), hybrid),
+                    cb.notLike(cb.lower(root.get("description")), remote),
+                    cb.notLike(cb.lower(root.get("description")), hybrid)
             );
         };
     }

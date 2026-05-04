@@ -11,6 +11,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class JobNeedPreferenceService {
@@ -50,6 +53,12 @@ public class JobNeedPreferenceService {
         if (request.getMaxSalary() != null) {
             preference.setMaxSalary(request.getMaxSalary());
         }
+        if (request.getPreferredSkills() != null) {
+            preference.setPreferredSkills(serializeList(request.getPreferredSkills()));
+        }
+        if (request.getExcludedKeywords() != null) {
+            preference.setExcludedKeywords(serializeList(request.getExcludedKeywords()));
+        }
         if (request.getRemoteOnly() != null) {
             preference.setRemoteOnly(request.getRemoteOnly());
         }
@@ -72,6 +81,8 @@ public class JobNeedPreferenceService {
                 || hasText(preference.getDesiredExperienceLevel())
                 || preference.getMinSalary() != null
                 || preference.getMaxSalary() != null
+                || hasText(preference.getPreferredSkills())
+                || hasText(preference.getExcludedKeywords())
                 || Boolean.TRUE.equals(preference.getRemoteOnly())
         );
     }
@@ -100,6 +111,28 @@ public class JobNeedPreferenceService {
         return value != null && !value.isBlank();
     }
 
+    private String serializeList(List<String> values) {
+        if (values == null) {
+            return null;
+        }
+        String serialized = values.stream()
+                .filter(this::hasText)
+                .map(String::trim)
+                .distinct()
+                .collect(Collectors.joining(","));
+        return serialized.isBlank() ? null : serialized;
+    }
+
+    public List<String> deserializeList(String value) {
+        if (!hasText(value)) {
+            return List.of();
+        }
+        return Arrays.stream(value.split(","))
+                .map(String::trim)
+                .filter(this::hasText)
+                .toList();
+    }
+
     private JobNeedPreferenceDTO toDto(JobNeedPreference preference) {
         JobNeedPreferenceDTO dto = new JobNeedPreferenceDTO();
         dto.setDesiredTitle(preference.getDesiredTitle());
@@ -109,6 +142,8 @@ public class JobNeedPreferenceService {
         dto.setDesiredExperienceLevel(preference.getDesiredExperienceLevel());
         dto.setMinSalary(preference.getMinSalary());
         dto.setMaxSalary(preference.getMaxSalary());
+        dto.setPreferredSkills(deserializeList(preference.getPreferredSkills()));
+        dto.setExcludedKeywords(deserializeList(preference.getExcludedKeywords()));
         dto.setRemoteOnly(Boolean.TRUE.equals(preference.getRemoteOnly()));
         dto.setConfigured(hasConfiguredCriteria(preference));
         dto.setUpdatedAt(preference.getUpdatedAt());

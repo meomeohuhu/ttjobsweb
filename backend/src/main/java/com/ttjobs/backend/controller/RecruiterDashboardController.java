@@ -65,9 +65,27 @@ public class RecruiterDashboardController {
         return recruiterWorkspaceService.getManagedApplications(companyId, jobId, status, keyword, page, size);
     }
 
+    @PostMapping("/applications/ai-screen")
+    public List<RecruiterApplicationDTO> screenManagedApplications(@RequestParam(required = false) Long companyId,
+                                                                   @RequestParam(required = false) Long jobId,
+                                                                   @RequestParam(required = false) String status,
+                                                                   @RequestParam(required = false) String keyword,
+                                                                   @RequestParam(required = false, defaultValue = "0") Integer minScore,
+                                                                   @RequestParam(required = false, defaultValue = "0") Integer page,
+                                                                   @RequestParam(required = false, defaultValue = "100") Integer size,
+                                                                   @RequestParam(required = false, defaultValue = "false") Boolean refresh) {
+        return recruiterWorkspaceService.screenManagedApplications(companyId, jobId, status, keyword, minScore, page, size, refresh);
+    }
+
     @GetMapping("/applications/{id}")
     public RecruiterApplicationDetailDTO getManagedApplicationDetail(@PathVariable Long id) {
         return recruiterWorkspaceService.getManagedApplicationDetail(id);
+    }
+
+    @PostMapping("/applications/{id}/ai-score")
+    public RecruiterApplicationDetailDTO scoreManagedApplication(@PathVariable Long id,
+                                                                @RequestParam(required = false, defaultValue = "false") Boolean refresh) {
+        return recruiterWorkspaceService.scoreManagedApplication(id, refresh);
     }
 
     @PutMapping("/applications/status")

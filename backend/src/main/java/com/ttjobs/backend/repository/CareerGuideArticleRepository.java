@@ -11,4 +11,5 @@ public interface CareerGuideArticleRepository extends JpaRepository<CareerGuideA
     List<CareerGuideArticle> findByPublishedAtIsNotNullOrderByFeaturedDescPublishedAtDescIdDesc();
 
     Optional<CareerGuideArticle> findBySlugAndPublishedAtIsNotNull(String slug);
+    Optional<CareerGuideArticle> findBySlug(String slug);
 }

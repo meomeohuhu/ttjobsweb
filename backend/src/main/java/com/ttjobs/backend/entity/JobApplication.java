@@ -7,6 +7,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Column;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import lombok.Data;
@@ -27,6 +28,10 @@ public class JobApplication {
     // Snapshot CV info at apply time (do not expose URL via DTO).
     private String cvUrl;
     private String cvFileName;
+    @Column(columnDefinition = "TEXT")
+    private String cvTextSnapshot;
+    @Column(columnDefinition = "TEXT")
+    private String coverLetter;
 
     @ManyToOne
     @JoinColumn(name = "user_id")

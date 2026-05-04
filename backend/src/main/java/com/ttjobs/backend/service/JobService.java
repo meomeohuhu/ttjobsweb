@@ -333,18 +333,18 @@ public class JobService {
         String normalized = sort == null ? "latest" : sort.trim().toLowerCase();
         return switch (normalized) {
             case "salary_high", "salary_desc" -> Sort.by(
-                    Sort.Order.desc("salaryMax").nullsLast(),
-                    Sort.Order.desc("salary").nullsLast(),
-                    Sort.Order.desc("salaryMin").nullsLast(),
-                    Sort.Order.desc("postedDate").nullsLast()
+                    Sort.Order.desc("salaryMax"),
+                    Sort.Order.desc("salary"),
+                    Sort.Order.desc("salaryMin"),
+                    Sort.Order.desc("postedDate")
             );
             case "salary_low", "salary_asc" -> Sort.by(
-                    Sort.Order.asc("salaryMin").nullsLast(),
-                    Sort.Order.asc("salary").nullsLast(),
-                    Sort.Order.asc("salaryMax").nullsLast(),
-                    Sort.Order.desc("postedDate").nullsLast()
+                    Sort.Order.asc("salaryMin"),
+                    Sort.Order.asc("salary"),
+                    Sort.Order.asc("salaryMax"),
+                    Sort.Order.desc("postedDate")
             );
-            default -> Sort.by(Sort.Order.desc("postedDate").nullsLast(), Sort.Order.desc("id"));
+            default -> Sort.by(Sort.Order.desc("postedDate"), Sort.Order.desc("id"));
         };
     }
 

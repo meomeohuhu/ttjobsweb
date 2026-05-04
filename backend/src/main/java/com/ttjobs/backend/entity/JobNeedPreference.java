@@ -31,6 +31,12 @@ public class JobNeedPreference {
     @Column(precision = 19, scale = 2)
     private BigDecimal maxSalary;
 
+    @Column(columnDefinition = "TEXT")
+    private String preferredSkills;
+
+    @Column(columnDefinition = "TEXT")
+    private String excludedKeywords;
+
     @Column(nullable = false)
     private Boolean remoteOnly;
 
