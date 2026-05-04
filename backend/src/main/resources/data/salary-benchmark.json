@@ -1,0 +1,17 @@
+[
+  {"industry":"Công nghệ thông tin","location":"Hà Nội","level":"Junior","p25":12,"p50":18,"p75":25},
+  {"industry":"Công nghệ thông tin","location":"TP Hồ Chí Minh","level":"Mid","p25":25,"p50":38,"p75":55},
+  {"industry":"Công nghệ thông tin","location":"Remote","level":"Senior","p25":45,"p50":65,"p75":90},
+  {"industry":"Kinh doanh - Bán hàng","location":"Hà Nội","level":"Junior","p25":8,"p50":12,"p75":18},
+  {"industry":"Kinh doanh - Bán hàng","location":"TP Hồ Chí Minh","level":"Mid","p25":16,"p50":24,"p75":38},
+  {"industry":"Marketing - PR","location":"Hà Nội","level":"Junior","p25":9,"p50":14,"p75":20},
+  {"industry":"Marketing - PR","location":"TP Hồ Chí Minh","level":"Mid","p25":18,"p50":28,"p75":42},
+  {"industry":"Nhân sự - Hành chính","location":"Hà Nội","level":"Junior","p25":8,"p50":12,"p75":17},
+  {"industry":"Nhân sự - Hành chính","location":"TP Hồ Chí Minh","level":"Mid","p25":15,"p50":22,"p75":32},
+  {"industry":"Tài chính - Kế toán","location":"Hà Nội","level":"Junior","p25":9,"p50":13,"p75":19},
+  {"industry":"Tài chính - Kế toán","location":"TP Hồ Chí Minh","level":"Senior","p25":30,"p50":45,"p75":70},
+  {"industry":"Thiết kế","location":"Hà Nội","level":"Junior","p25":10,"p50":15,"p75":22},
+  {"industry":"Thiết kế","location":"TP Hồ Chí Minh","level":"Mid","p25":20,"p50":30,"p75":45},
+  {"industry":"Chăm sóc khách hàng","location":"Hà Nội","level":"Junior","p25":7,"p50":10,"p75":14},
+  {"industry":"Vận hành","location":"TP Hồ Chí Minh","level":"Senior","p25":28,"p50":40,"p75":60}
+]

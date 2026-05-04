@@ -13,6 +13,7 @@ public class JobApplicationDTO {
     private Long jobId;
     private String jobTitle;
     private String companyName;
+    private String coverLetter;
     // Flag for UI to show CV availability without exposing URL.
     private boolean hasCv;
 }

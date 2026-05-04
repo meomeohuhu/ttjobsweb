@@ -8,6 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.thymeleaf.TemplateEngine;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -18,6 +19,9 @@ class EmailServiceTest {
 
     @Mock
     private JavaMailSender mailSender;
+
+    @Mock
+    private TemplateEngine templateEngine;
 
     private EmailService emailService;
 
@@ -48,7 +52,7 @@ class EmailServiceTest {
     }
 
     private EmailService buildService(boolean enabled) {
-        return new EmailService(mailSender, enabled, "noreply@ttjobs.local");
+        return new EmailService(mailSender, templateEngine, enabled, "noreply@ttjobs.local", "http://localhost:5173");
     }
 
     private User user(Long id, String email) {

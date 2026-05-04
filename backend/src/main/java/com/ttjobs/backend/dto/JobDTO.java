@@ -27,5 +27,6 @@ public class JobDTO {
     private String companyLogoUrl;
     private Long savedCount;
     private Integer matchScore;
+    private String matchReason;
     private List<String> matchReasons;
 }

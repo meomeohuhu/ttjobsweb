@@ -48,6 +48,52 @@ class JobSearchSpecificationTest {
     }
 
     @Test
+    void keywordFilter_shouldMatchCompanyNameTokens() {
+        Company company = createCompany("TTJobs Demo Company");
+        Job companyJob = createJob(company, "Backend Engineer", "Build APIs", BigDecimal.valueOf(1000), BigDecimal.valueOf(2000));
+        createJob(createCompany("Growth Lab"), "Sales Executive", "Business development", BigDecimal.valueOf(500), BigDecimal.valueOf(800));
+
+        Specification<Job> spec = Specification.where(JobSpecifications.activeJobs())
+                .and(JobSpecifications.keywordLike("demo company"));
+
+        List<Job> results = jobRepository.findAll(spec, PageRequest.of(0, 10)).getContent();
+        assertEquals(1, results.size());
+        assertEquals(companyJob.getId(), results.get(0).getId());
+    }
+
+    @Test
+    void keywordFilter_shouldMatchSkillName() {
+        Company company = createCompany("Alpha");
+        Skill java = createSkill("Java");
+        Job javaJob = createJob(company, "Backend Engineer", "Build APIs", BigDecimal.valueOf(1000), BigDecimal.valueOf(2000));
+        javaJob.setSkills(new ArrayList<>(List.of(java)));
+        jobRepository.save(javaJob);
+        createJob(company, "Designer", "UI/UX", BigDecimal.valueOf(500), BigDecimal.valueOf(800));
+
+        Specification<Job> spec = Specification.where(JobSpecifications.activeJobs())
+                .and(JobSpecifications.keywordLike("java"));
+
+        List<Job> results = jobRepository.findAll(spec, PageRequest.of(0, 10)).getContent();
+        assertEquals(1, results.size());
+        assertEquals(javaJob.getId(), results.get(0).getId());
+    }
+
+    @Test
+    void excludedKeywordFilter_shouldRemoveMatchingJobs() {
+        Company company = createCompany("Alpha");
+        Job backend = createJob(company, "Backend Engineer", "Build APIs", BigDecimal.valueOf(1000), BigDecimal.valueOf(2000));
+        createJob(company, "Backend Intern", "Entry internship", BigDecimal.valueOf(500), BigDecimal.valueOf(800));
+
+        Specification<Job> spec = Specification.where(JobSpecifications.activeJobs())
+                .and(JobSpecifications.keywordLike("backend"))
+                .and(JobSpecifications.keywordNotLike(List.of("intern")));
+
+        List<Job> results = jobRepository.findAll(spec, PageRequest.of(0, 10)).getContent();
+        assertEquals(1, results.size());
+        assertEquals(backend.getId(), results.get(0).getId());
+    }
+
+    @Test
     void salaryRangeFilter_shouldMatchRange() {
         Company company = createCompany("Beta");
         createJob(company, "Junior", "Entry", BigDecimal.valueOf(300), BigDecimal.valueOf(600));

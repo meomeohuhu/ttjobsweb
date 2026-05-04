@@ -18,4 +18,8 @@ public class RecruiterApplicationDTO {
     private Long companyId;
     private String companyName;
     private boolean hasCv;
+    private Integer aiScore;
+    private String aiLevel;
+    private LocalDateTime aiScoredAt;
+    private boolean aiScoreAvailable;
 }

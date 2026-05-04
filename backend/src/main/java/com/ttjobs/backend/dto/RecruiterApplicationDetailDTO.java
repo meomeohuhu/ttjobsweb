@@ -22,5 +22,11 @@ public class RecruiterApplicationDetailDTO {
     private Long companyId;
     private String companyName;
     private boolean hasCv;
+    private Integer aiScore;
+    private String aiLevel;
+    private Double aiRawScore;
+    private List<String> aiSignals;
+    private LocalDateTime aiScoredAt;
+    private boolean aiScoreAvailable;
     private List<ApplicationTimelineDTO> timeline;
 }

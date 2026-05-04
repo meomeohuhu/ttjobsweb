@@ -28,6 +28,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -168,6 +169,15 @@ public class JobApplicationService {
     }
 
     public JobApplicationDTO applyForJob(Long jobId, MultipartFile file, boolean useProfileCv, boolean saveToCvList) {
+        return applyForJob(jobId, file, null, useProfileCv, false, saveToCvList, null);
+    }
+
+    public JobApplicationDTO applyForJob(Long jobId, MultipartFile file, boolean useProfileCv, boolean saveToCvList, String coverLetter) {
+        return applyForJob(jobId, file, null, useProfileCv, false, saveToCvList, coverLetter);
+    }
+
+    public JobApplicationDTO applyForJob(Long jobId, MultipartFile file, Long cvId, boolean useProfileCv,
+                                         boolean useSystemCv, boolean saveToCvList, String coverLetter) {
         User currentUser = authContextService.requireCurrentUser();
 
         if (currentUser.getRole() != User.Role.CANDIDATE) {
@@ -196,8 +206,9 @@ public class JobApplicationService {
         application.setJob(job);
         application.setApplicationDate(LocalDateTime.now());
         application.setStatus(SUBMITTED);
+        application.setCoverLetter(coverLetter == null || coverLetter.isBlank() ? null : coverLetter.trim());
         // Attach CV snapshot based on upload or saved CV list.
-        attachCvSnapshot(application, user, file, useProfileCv, saveToCvList);
+        attachCvSnapshot(application, user, file, cvId, useProfileCv, useSystemCv, saveToCvList);
         JobApplication saved = jobApplicationRepository.save(application);
         logStatusChange(saved, currentUser, null, SUBMITTED);
         notificationService.createNotification(
@@ -228,12 +239,17 @@ public class JobApplicationService {
 
         requireRecruiterOwnership(currentUser, application.getJob());
 
-        if (application.getCvUrl() == null || application.getCvUrl().isBlank()) {
+        if ((application.getCvUrl() == null || application.getCvUrl().isBlank())
+                && (application.getCvTextSnapshot() == null || application.getCvTextSnapshot().isBlank())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No CV attached to this application");
         }
 
         recruiterActivityLogService.logCvViewed(currentUser, application);
-        streamFromUrl(application.getCvUrl(), application.getCvFileName(), response);
+        if (application.getCvUrl() != null && !application.getCvUrl().isBlank()) {
+            streamFromUrl(application.getCvUrl(), application.getCvFileName(), response);
+        } else {
+            streamTextCv(application.getCvTextSnapshot(), application.getCvFileName(), response);
+        }
     }
 
     public JobApplicationDTO updateApplicationStatus(Long applicationId, String status) {
@@ -261,6 +277,7 @@ public class JobApplicationService {
                 "Your application for " + saved.getJob().getTitle() + " is now " + targetStatus,
                 "APPLICATION_STATUS_UPDATED"
         );
+        emailService.sendApplicationStatusChanged(saved.getUser(), saved.getJob(), targetStatus);
         return convertToDTO(saved);
     }
 
@@ -379,7 +396,9 @@ public class JobApplicationService {
         dto.setId(application.getId());
         dto.setApplicationDate(application.getApplicationDate());
         dto.setStatus(application.getStatus());
-        dto.setHasCv(application.getCvUrl() != null && !application.getCvUrl().isBlank());
+        dto.setCoverLetter(application.getCoverLetter());
+        dto.setHasCv((application.getCvUrl() != null && !application.getCvUrl().isBlank())
+                || (application.getCvTextSnapshot() != null && !application.getCvTextSnapshot().isBlank()));
         if (application.getUser() != null) {
             dto.setUserId(application.getUser().getId());
             dto.setUserName(application.getUser().getName());
@@ -395,13 +414,14 @@ public class JobApplicationService {
     }
 
     private void attachCvSnapshot(JobApplication application, User user, MultipartFile file,
-                                  boolean useProfileCv, boolean saveToCvList) {
+                                  Long cvId, boolean useProfileCv, boolean useSystemCv, boolean saveToCvList) {
         boolean hasFile = file != null && !file.isEmpty();
-        if (!hasFile && !useProfileCv) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Must provide a CV file or use profile CV");
+        boolean hasSavedCvSelection = cvId != null || useProfileCv || useSystemCv;
+        if (!hasFile && !hasSavedCvSelection) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Must provide a CV file or choose a saved CV");
         }
-        if (hasFile && useProfileCv) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose either file upload or profile CV");
+        if (hasFile && hasSavedCvSelection) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose either file upload or saved CV");
         }
         if (hasFile) {
             validateCvFile(file);
@@ -442,18 +462,50 @@ public class JobApplicationService {
             }
         }
 
-        UserCv latestCv = userCvRepository.findTopByUserIdOrderByUploadedAtDesc(user.getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "No profile CV found"));
-        application.setCvUrl(latestCv.getCvUrl());
-        application.setCvFileName(latestCv.getFileName());
-        application.setCv(latestCv);
+        if (useSystemCv) {
+            String cvText = buildSystemCvText(user);
+            if (cvText.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "System CV is empty");
+            }
+            application.setCvTextSnapshot(cvText);
+            application.setCvFileName("ttjobs-system-cv-" + user.getId() + ".txt");
+            user.setCvText(cvText);
+            userRepository.save(user);
+            return;
+        }
+
+        UserCv selectedCv = cvId != null
+                ? userCvRepository.findByIdAndUserId(cvId, user.getId())
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Saved CV not found"))
+                : userCvRepository.findTopByUserIdOrderByUploadedAtDesc(user.getId())
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "No saved CV found"));
+        application.setCvUrl(selectedCv.getCvUrl());
+        application.setCvFileName(selectedCv.getFileName());
+        application.setCv(selectedCv);
 
         if (user.getCvText() == null || user.getCvText().isBlank()) {
-            byte[] data = downloadCvBytes(latestCv.getCvUrl());
-            String cvText = cvTextExtractionService.extractText(data, null, latestCv.getFileName());
+            byte[] data = downloadCvBytes(selectedCv.getCvUrl());
+            String cvText = cvTextExtractionService.extractText(data, null, selectedCv.getFileName());
             user.setCvText(cvText);
             userRepository.save(user);
         }
+    }
+
+    private String buildSystemCvText(User user) {
+        return java.util.stream.Stream.of(
+                        "Ho ten: " + Objects.requireNonNullElse(user.getName(), ""),
+                        "Email: " + Objects.requireNonNullElse(user.getEmail(), ""),
+                        "So dien thoai: " + Objects.requireNonNullElse(user.getPhone(), ""),
+                        "Vi tri ung tuyen: " + Objects.requireNonNullElse(user.getCvRole(), ""),
+                        "Muc tieu nghe nghiep: " + Objects.requireNonNullElse(user.getCvObjective(), ""),
+                        "Kinh nghiem noi bat: " + Objects.requireNonNullElse(user.getCvExperienceHighlights(), ""),
+                        "Ky nang: " + (user.getSkills() == null ? "" : user.getSkills().stream()
+                                .map(skill -> skill.getName())
+                                .filter(Objects::nonNull)
+                                .collect(Collectors.joining(", ")))
+                )
+                .filter(line -> line.substring(line.indexOf(':') + 1).trim().length() > 0)
+                .collect(Collectors.joining("\n"));
     }
 
     private void validateCvFile(MultipartFile file) {
@@ -516,6 +568,22 @@ public class JobApplicationService {
     private String buildInlineDisposition(String fileName) {
         String encoded = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20");
         return "inline; filename=\"" + fileName.replace("\"", "") + "\"; filename*=UTF-8''" + encoded;
+    }
+
+    private void streamTextCv(String cvText, String fileName, HttpServletResponse response) {
+        try {
+            String safeName = (fileName == null || fileName.isBlank()) ? "ttjobs-system-cv.txt" : fileName.trim();
+            if (!safeName.toLowerCase().endsWith(".txt")) {
+                safeName = safeName + ".txt";
+            }
+            safeName = safeName.replace("\r", "").replace("\n", "");
+            response.setContentType("text/plain; charset=UTF-8");
+            response.setHeader("Content-Disposition", buildInlineDisposition(safeName));
+            response.getOutputStream().write(cvText.getBytes(StandardCharsets.UTF_8));
+            response.getOutputStream().flush();
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to stream CV");
+        }
     }
 
     private String sanitizeCvDownloadName(String fileName, String contentType) {

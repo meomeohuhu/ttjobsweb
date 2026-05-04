@@ -5,6 +5,7 @@ import com.ttjobs.backend.entity.JobNeedPreference;
 import com.ttjobs.backend.entity.User;
 import com.ttjobs.backend.repository.JobNeedPreferenceRepository;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -52,6 +53,8 @@ class JobNeedPreferenceServiceTest {
         request.setDesiredTitle("Backend Engineer");
         request.setMinSalary(BigDecimal.valueOf(15000000));
         request.setMaxSalary(BigDecimal.valueOf(30000000));
+        request.setPreferredSkills(List.of("Java", "Spring Boot"));
+        request.setExcludedKeywords(List.of("Intern", "unpaid"));
         request.setRemoteOnly(true);
 
         when(authContextService.requireCurrentUser()).thenReturn(candidate);
@@ -61,6 +64,8 @@ class JobNeedPreferenceServiceTest {
         var result = jobNeedPreferenceService.updateMyPreferences(request);
 
         assertEquals("Backend Engineer", result.getDesiredTitle());
+        assertEquals(List.of("Java", "Spring Boot"), result.getPreferredSkills());
+        assertEquals(List.of("Intern", "unpaid"), result.getExcludedKeywords());
         assertEquals(true, result.getRemoteOnly());
     }
 

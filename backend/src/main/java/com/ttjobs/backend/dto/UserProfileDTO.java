@@ -14,6 +14,8 @@ public class UserProfileDTO {
     private String address;
     private Integer experienceYears;
     private String cvUrl;
+    private String primaryCvType;
+    private String cvText;
     private String cvRole;
     private String cvObjective;
     private String cvExperienceHighlights;

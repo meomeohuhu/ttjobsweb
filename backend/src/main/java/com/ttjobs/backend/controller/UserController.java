@@ -6,6 +6,11 @@ import com.ttjobs.backend.dto.UserCvDTO;
 import com.ttjobs.backend.dto.UserCvTextDTO;
 import com.ttjobs.backend.dto.UserAvatarDTO;
 import com.ttjobs.backend.dto.UserProfileDTO;
+import com.ttjobs.backend.dto.EmailChangeConfirmRequest;
+import com.ttjobs.backend.dto.EmailChangeRequest;
+import com.ttjobs.backend.dto.EmailChangeResponse;
+import com.ttjobs.backend.dto.PersonalityProfileDTO;
+import com.ttjobs.backend.dto.SavePersonalityRequest;
 import com.ttjobs.backend.dto.ChangePasswordRequest;
 import com.ttjobs.backend.dto.UpdateMyProfileRequest;
 import com.ttjobs.backend.service.CandidateDashboardService;
@@ -13,6 +18,7 @@ import com.ttjobs.backend.service.UserAvatarService;
 import com.ttjobs.backend.service.UserCvService;
 import com.ttjobs.backend.service.UserInterviewService;
 import com.ttjobs.backend.service.UserProfileService;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,6 +33,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
@@ -59,6 +66,21 @@ public class UserController {
         return userProfileService.getMyProfile();
     }
 
+    @GetMapping("/users/me/personality")
+    public PersonalityProfileDTO getMyPersonalityProfile() {
+        return userProfileService.getMyPersonalityProfile();
+    }
+
+    @PostMapping("/users/me/personality")
+    public PersonalityProfileDTO saveMyPersonalityProfile(@Valid @RequestBody SavePersonalityRequest request) {
+        return userProfileService.saveMyPersonalityProfile(request);
+    }
+
+    @GetMapping("/users/{id}/personality")
+    public PersonalityProfileDTO getPublicPersonalityProfile(@PathVariable Long id) {
+        return userProfileService.getPublicPersonalityProfile(id);
+    }
+
     @GetMapping("/users/me/interviews")
     public List<InterviewScheduleDTO> getMyInterviews() {
         return userInterviewService.getMyInterviews();
@@ -74,6 +96,17 @@ public class UserController {
         return userProfileService.updateMyProfile(request);
     }
 
+    @PostMapping("/users/me/email-change/request")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void requestEmailChange(@Valid @RequestBody EmailChangeRequest request) {
+        userProfileService.requestEmailChange(request);
+    }
+
+    @PostMapping("/users/me/email-change/confirm")
+    public EmailChangeResponse confirmEmailChange(@Valid @RequestBody EmailChangeConfirmRequest request) {
+        return userProfileService.confirmEmailChange(request);
+    }
+
     @PutMapping("/users/me/password")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void changeMyPassword(@Valid @RequestBody ChangePasswordRequest request) {
@@ -83,6 +116,11 @@ public class UserController {
     @GetMapping("/users/me/cv")
     public UserCvDTO getMyCv() {
         return userCvService.getMyCv();
+    }
+
+    @GetMapping("/users/me/cvs")
+    public List<UserCvDTO> getMyCvs() {
+        return userCvService.getMyCvs();
     }
 
     @PostMapping(value = "/users/me/cv", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -100,6 +138,21 @@ public class UserController {
         userCvService.deleteMyCv();
     }
 
+    @DeleteMapping("/users/me/cvs/{id}")
+    public void deleteMyCvById(@PathVariable Long id) {
+        userCvService.deleteMyCvById(id);
+    }
+
+    @GetMapping("/users/me/cv-stream")
+    public void streamMyCurrentCv(HttpServletResponse response) {
+        userCvService.streamMyCurrentCv(response);
+    }
+
+    @GetMapping("/users/me/cvs/{id}/stream")
+    public void streamMyCvById(@PathVariable Long id, HttpServletResponse response) {
+        userCvService.streamMyCvById(id, response);
+    }
+
     @GetMapping("/users/me/cv-text")
     public UserCvTextDTO getMyCvText() {
         return userCvService.getMyCvText();
@@ -108,6 +161,11 @@ public class UserController {
     @PostMapping("/users/me/cv-text")
     public UserCvTextDTO extractMyCvText() {
         return userCvService.extractMyCvText();
+    }
+
+    @PostMapping("/users/me/cv/parse-skills")
+    public List<String> parseMyCvSkills() {
+        return userCvService.parseMyCvSkills();
     }
 
     @GetMapping("/users/me/avatar")

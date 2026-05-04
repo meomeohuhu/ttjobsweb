@@ -50,10 +50,13 @@ public class JobApplicationController {
     public JobApplicationDTO applyForJob(
             @RequestParam @NotNull Long jobId,
             @RequestParam(required = false) MultipartFile file,
+            @RequestParam(required = false) Long cvId,
             @RequestParam(defaultValue = "false") boolean useProfileCv,
-            @RequestParam(defaultValue = "false") boolean saveToCvList
+            @RequestParam(defaultValue = "false") boolean useSystemCv,
+            @RequestParam(defaultValue = "false") boolean saveToCvList,
+            @RequestParam(required = false) String coverLetter
     ) {
-        return jobApplicationService.applyForJob(jobId, file, useProfileCv, saveToCvList);
+        return jobApplicationService.applyForJob(jobId, file, cvId, useProfileCv, useSystemCv, saveToCvList, coverLetter);
     }
 
     @PutMapping("/{applicationId}/status")

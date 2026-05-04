@@ -4,7 +4,10 @@ import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
 import com.ttjobs.backend.dto.UserCvDTO;
 import com.ttjobs.backend.entity.User;
+import com.ttjobs.backend.entity.UserCv;
+import com.ttjobs.backend.repository.UserCvRepository;
 import com.ttjobs.backend.repository.UserRepository;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -13,6 +16,10 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -20,6 +27,7 @@ import java.util.Set;
 public class UserCvService {
 
     private static final long MAX_CV_SIZE = 5L * 1024 * 1024;
+    private static final long STREAM_MAX_SIZE = 10L * 1024 * 1024;
     private static final int DOWNLOAD_CONNECT_TIMEOUT_MS = 3000;
     private static final int DOWNLOAD_READ_TIMEOUT_MS = 5000;
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
@@ -35,6 +43,9 @@ public class UserCvService {
     private UserRepository userRepository;
 
     @Autowired
+    private UserCvRepository userCvRepository;
+
+    @Autowired
     private ObjectProvider<Cloudinary> cloudinaryProvider;
     @Autowired
     private CvTextExtractionService cvTextExtractionService;
@@ -42,6 +53,14 @@ public class UserCvService {
     public UserCvDTO getMyCv() {
         User currentUser = authContextService.requireCurrentUser();
         return toDto(currentUser);
+    }
+
+    public List<UserCvDTO> getMyCvs() {
+        User currentUser = authContextService.requireCurrentUser();
+        return userCvRepository.findByUserIdOrderByUploadedAtDesc(currentUser.getId())
+                .stream()
+                .map((cv) -> toDto(cv, currentUser))
+                .toList();
     }
 
     public com.ttjobs.backend.dto.UserCvTextDTO getMyCvText() {
@@ -58,6 +77,18 @@ public class UserCvService {
         String cvText = cvTextExtractionService.extractText(data, null, currentUser.getCvUrl());
         currentUser.setCvText(cvText);
         return toTextDto(userRepository.save(currentUser));
+    }
+
+    public java.util.List<String> parseMyCvSkills() {
+        User currentUser = authContextService.requireCurrentUser();
+        String cvText = currentUser.getCvText();
+        if ((cvText == null || cvText.isBlank()) && currentUser.getCvUrl() != null && !currentUser.getCvUrl().isBlank()) {
+            byte[] data = downloadCvBytes(currentUser.getCvUrl());
+            cvText = cvTextExtractionService.extractText(data, null, currentUser.getCvUrl());
+            currentUser.setCvText(cvText);
+            userRepository.save(currentUser);
+        }
+        return cvTextExtractionService.suggestSkills(cvText);
     }
 
     public UserCvDTO uploadMyCv(MultipartFile file) {
@@ -101,7 +132,16 @@ public class UserCvService {
 
             currentUser.setCvUrl(cvUrl);
             currentUser.setCvText(cvText);
-            return toDto(userRepository.save(currentUser));
+            User savedUser = userRepository.save(currentUser);
+
+            UserCv cv = new UserCv();
+            cv.setUser(savedUser);
+            cv.setCvUrl(cvUrl);
+            cv.setFileName(file.getOriginalFilename());
+            cv.setUploadedAt(LocalDateTime.now());
+            userCvRepository.save(cv);
+
+            return toDto(savedUser);
         } catch (IOException e) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Cloud upload failed");
         }
@@ -118,6 +158,41 @@ public class UserCvService {
         currentUser.setCvUrl(null);
         currentUser.setCvText(null);
         userRepository.save(currentUser);
+    }
+
+    public void deleteMyCvById(Long id) {
+        User currentUser = authContextService.requireCurrentUser();
+        UserCv cv = userCvRepository.findByIdAndUserId(id, currentUser.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "CV not found"));
+
+        Cloudinary cloudinary = requireCloudinary();
+        removeExistingCvIfPossible(cloudinary, cv.getCvUrl());
+
+        if (cv.getCvUrl() != null && cv.getCvUrl().equals(currentUser.getCvUrl())) {
+            currentUser.setCvUrl(null);
+            currentUser.setCvText(null);
+            userRepository.save(currentUser);
+        }
+        userCvRepository.delete(cv);
+    }
+
+    public void streamMyCurrentCv(HttpServletResponse response) {
+        User currentUser = authContextService.requireCurrentUser();
+        if (currentUser.getCvUrl() == null || currentUser.getCvUrl().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "CV not found");
+        }
+        UserCv latestCv = userCvRepository.findTopByUserIdOrderByUploadedAtDesc(currentUser.getId()).orElse(null);
+        String fileName = latestCv != null && currentUser.getCvUrl().equals(latestCv.getCvUrl())
+                ? latestCv.getFileName()
+                : "ttjobs-cv.pdf";
+        streamFromUrl(currentUser.getCvUrl(), fileName, response);
+    }
+
+    public void streamMyCvById(Long id, HttpServletResponse response) {
+        User currentUser = authContextService.requireCurrentUser();
+        UserCv cv = userCvRepository.findByIdAndUserId(id, currentUser.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "CV not found"));
+        streamFromUrl(cv.getCvUrl(), cv.getFileName(), response);
     }
 
     private Cloudinary requireCloudinary() {
@@ -169,6 +244,18 @@ public class UserCvService {
         UserCvDTO dto = new UserCvDTO();
         dto.setUserId(user.getId());
         dto.setCvUrl(user.getCvUrl());
+        dto.setCurrent(Boolean.TRUE);
+        return dto;
+    }
+
+    private UserCvDTO toDto(UserCv cv, User currentUser) {
+        UserCvDTO dto = new UserCvDTO();
+        dto.setId(cv.getId());
+        dto.setUserId(currentUser.getId());
+        dto.setCvUrl(cv.getCvUrl());
+        dto.setFileName(cv.getFileName());
+        dto.setUploadedAt(cv.getUploadedAt());
+        dto.setCurrent(cv.getCvUrl() != null && cv.getCvUrl().equals(currentUser.getCvUrl()));
         return dto;
     }
 
@@ -190,6 +277,76 @@ public class UserCvService {
         } catch (IOException e) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to download CV");
         }
+    }
+
+    private void streamFromUrl(String cvUrl, String fileName, HttpServletResponse response) {
+        try {
+            java.net.URLConnection connection = new java.net.URL(cvUrl).openConnection();
+            connection.setConnectTimeout(DOWNLOAD_CONNECT_TIMEOUT_MS);
+            connection.setReadTimeout(DOWNLOAD_READ_TIMEOUT_MS);
+            String contentType = inferCvContentType(fileName, connection.getContentType());
+            if (contentType == null || contentType.isBlank()) {
+                contentType = "application/octet-stream";
+            }
+            response.setContentType(contentType);
+            response.setHeader("Content-Disposition", buildInlineDisposition(sanitizeCvDownloadName(fileName, contentType)));
+
+            try (java.io.InputStream input = connection.getInputStream();
+                 java.io.OutputStream output = response.getOutputStream()) {
+                byte[] buffer = new byte[8192];
+                int read;
+                long total = 0;
+                while ((read = input.read(buffer)) != -1) {
+                    total += read;
+                    if (total > STREAM_MAX_SIZE) {
+                        throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "CV file size exceeds 10MB");
+                    }
+                    output.write(buffer, 0, read);
+                }
+                output.flush();
+            }
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to stream CV");
+        }
+    }
+
+    private String buildInlineDisposition(String fileName) {
+        String safeName = fileName.replace("\"", "");
+        String encoded = URLEncoder.encode(safeName, StandardCharsets.UTF_8).replace("+", "%20");
+        return "inline; filename=\"" + safeName + "\"; filename*=UTF-8''" + encoded;
+    }
+
+    private String sanitizeCvDownloadName(String fileName, String contentType) {
+        String safeName = (fileName == null || fileName.isBlank()) ? "ttjobs-cv" : fileName.trim();
+        if (!safeName.contains(".")) {
+            safeName = safeName + guessCvExtension(contentType);
+        }
+        return safeName.replace("\r", "").replace("\n", "");
+    }
+
+    private String inferCvContentType(String fileName, String fallbackContentType) {
+        String lowerName = fileName == null ? "" : fileName.toLowerCase();
+        if (lowerName.endsWith(".pdf")) {
+            return "application/pdf";
+        }
+        if (lowerName.endsWith(".doc")) {
+            return "application/msword";
+        }
+        if (lowerName.endsWith(".docx")) {
+            return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        }
+        return fallbackContentType;
+    }
+
+    private String guessCvExtension(String contentType) {
+        String type = contentType == null ? "" : contentType.toLowerCase();
+        if (type.contains("officedocument.wordprocessingml.document")) {
+            return ".docx";
+        }
+        if (type.contains("msword")) {
+            return ".doc";
+        }
+        return ".pdf";
     }
 
     private byte[] readLimited(java.io.InputStream input, long maxBytes) throws IOException {
