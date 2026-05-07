@@ -650,6 +650,8 @@ public class RecruiterWorkspaceService {
             dto.setAiLevel(score.getLevel());
             dto.setAiRawScore(score.getRawScore());
             dto.setAiSignals(deserializeSignals(score.getSignals()));
+            dto.setAiPros(deserializeSignals(score.getPros()));
+            dto.setAiCons(deserializeSignals(score.getCons()));
             dto.setAiScoredAt(score.getScoredAt());
             dto.setAiScoreAvailable(true);
         });
@@ -682,6 +684,8 @@ public class RecruiterWorkspaceService {
         entity.setLevel(isBlank(aiScore.getLevel()) ? "possible_match" : aiScore.getLevel());
         entity.setRawScore(aiScore.getRawScore());
         entity.setSignals(serializeSignals(aiScore.getSignals()));
+        entity.setPros(serializeSignals(aiScore.getPros()));
+        entity.setCons(serializeSignals(aiScore.getCons()));
         entity.setCvHash(cvHash);
         entity.setJobHash(jobHash);
         entity.setScoredAt(LocalDateTime.now());

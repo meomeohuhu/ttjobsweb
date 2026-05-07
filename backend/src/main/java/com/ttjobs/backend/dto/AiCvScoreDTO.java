@@ -10,4 +10,6 @@ public class AiCvScoreDTO {
     private String level;
     private Double rawScore;
     private List<String> signals;
+    private List<String> pros;
+    private List<String> cons;
 }

@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -64,7 +65,8 @@ class JobApplicationControllerApiTest {
         app.setId(20L);
         app.setStatus("submitted");
 
-        when(jobApplicationService.applyForJob(2L, null, true, false)).thenReturn(app);
+        when(jobApplicationService.applyForJob(eq(2L), isNull(), isNull(), eq(true), eq(false), eq(false), isNull()))
+                .thenReturn(app);
 
         mockMvc.perform(multipart("/api/applications/apply")
                         .param("jobId", "2")

@@ -51,6 +51,8 @@ public class JobService {
     private RecruiterActivityLogService recruiterActivityLogService;
     @Autowired
     private ImageUploadService imageUploadService;
+    @Autowired
+    private CompanyFollowService companyFollowService;
 
     public List<JobDTO> getAllJobs() {
         // Default candidate-facing list only shows open jobs.
@@ -147,6 +149,7 @@ public class JobService {
         normalizeCompensation(job);
         Job saved = jobRepository.save(job);
         recruiterActivityLogService.logJobCreated(currentUser, saved);
+        companyFollowService.notifyFollowersAboutNewJob(saved);
         return convertToDTO(saved);
     }
 
@@ -227,6 +230,7 @@ public class JobService {
                     previousStatus,
                     saved.getStatus()
             );
+            companyFollowService.notifyFollowersAboutNewJob(saved);
         } else if (changed) {
             recruiterActivityLogService.logJobUpdated(currentUser, saved);
         }
