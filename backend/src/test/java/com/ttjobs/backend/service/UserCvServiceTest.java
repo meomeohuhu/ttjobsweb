@@ -4,6 +4,8 @@ import com.cloudinary.Cloudinary;
 import com.cloudinary.Uploader;
 import com.ttjobs.backend.dto.UserCvDTO;
 import com.ttjobs.backend.entity.User;
+import com.ttjobs.backend.entity.UserCv;
+import com.ttjobs.backend.repository.UserCvRepository;
 import com.ttjobs.backend.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,6 +34,8 @@ class UserCvServiceTest {
     private AuthContextService authContextService;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private UserCvRepository userCvRepository;
     @Mock
     private ObjectProvider<Cloudinary> cloudinaryProvider;
     @Mock
@@ -75,6 +79,7 @@ class UserCvServiceTest {
         when(cvTextExtractionService.extractText(any(byte[].class), any(String.class), any(String.class)))
                 .thenReturn("text");
         when(userRepository.save(user)).thenReturn(user);
+        when(userCvRepository.save(any(UserCv.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         UserCvDTO result = userCvService.uploadMyCv(file);
         assertEquals(2L, result.getUserId());

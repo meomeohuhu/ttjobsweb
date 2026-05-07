@@ -26,6 +26,8 @@ public class RecruiterApplicationDetailDTO {
     private String aiLevel;
     private Double aiRawScore;
     private List<String> aiSignals;
+    private List<String> aiPros;
+    private List<String> aiCons;
     private LocalDateTime aiScoredAt;
     private boolean aiScoreAvailable;
     private List<ApplicationTimelineDTO> timeline;

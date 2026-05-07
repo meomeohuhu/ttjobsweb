@@ -36,6 +36,12 @@ public class ApplicationAiScore {
     @Column(columnDefinition = "TEXT")
     private String signals;
 
+    @Column(columnDefinition = "TEXT")
+    private String pros;
+
+    @Column(columnDefinition = "TEXT")
+    private String cons;
+
     @Column(nullable = false)
     private String cvHash;
 
