@@ -1,0 +1,127 @@
+services:
+  postgres:
+    image: postgres:16.4
+    container_name: ttjobs-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ttjobs_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - backend-net
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  backend:
+    image: ${DOCKER_USER}/ttjobs-backend:1.0.0
+    container_name: ttjobs-backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      SPRING_FLYWAY_ENABLED: "true"
+
+      TTJOBS_AI_BASE_URL: http://ai-service:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ai-service:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - backend-net
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  ai-service:
+    image: ${DOCKER_USER}/ttjobs-ai:1.0.0
+    container_name: ttjobs-ai
+    environment:
+      MODEL_DIR: /app/models
+      MATCHER_MODEL_DIR: /app/cv-job-matcher
+    volumes:
+      - ./ai-service/models:/app/models:ro
+      - ./ai-service/cv-job-matcher:/app/cv-job-matcher:ro
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - backend-net
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  nginx:
+    image: ${DOCKER_USER}/ttjobs-frontend:1.0.0
+    container_name: ttjobs-frontend
+    ports:
+      - "80:80"
+    volumes:
+      - ./deploy/nginx/ttjobs.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - backend-net
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: ttjobs-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@ttjobs.com
+      PGADMIN_DEFAULT_PASSWORD: strongpassword
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - backend-net
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  ttjobs_db:
+
+networks:
+  backend-net:
+    driver: bridge

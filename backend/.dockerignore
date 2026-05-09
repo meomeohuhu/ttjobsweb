@@ -1,0 +1,32 @@
+# Build artifacts
+target/
+src/test/
+*.log
+*.err
+hs_err_pid*.log
+replay_pid*.log
+
+# IDE and editor files
+.git/
+.gitignore
+.idea/
+.vscode/
+*.iml
+*.code-workspace
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.Thumbs.db
+
+# Build files
+pom.xml.bak
+release.properties
+pom.xml.releaseBackup
+
+# Documentation
+*.md
+README*
+HELP.md
