@@ -1,0 +1,78 @@
+# Build artifacts
+**/target/
+**/dist/
+**/node_modules/
+**/*.jar
+**/*.class
+
+# Test files
+**/src/test/
+**/*test*
+**/*Test*
+**/.pytest_cache/
+**/test_*
+
+# Python cache
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/*.so
+
+# IDE and editor files
+**/.vscode/
+**/.idea/
+**/.git/
+**/.gitignore
+**/.gitattributes
+**/*.iml
+**/*.code-workspace
+**/*.swp
+**/*.swo
+**/*~
+
+# Logs and temp files
+**/*.log
+**/*.err
+hs_err_pid*.log
+replay_pid*.log
+
+# Environment files
+.env
+.env.*
+.venv/
+venv/
+env/
+
+# OS files
+.DS_Store
+.Thumbs.db
+Thumbs.db
+
+# Screenshots and UI test artifacts
+.chrome-ui-*
+ui-*.png
+
+# Build process
+.mvn/
+mvnw
+mvnw.cmd
+
+# Documentation (optional - remove if you want docs in image)
+*.md
+README*
+CONTRIBUTING*
+LICENSE*
+HELP.md
+
+# Docker/deployment
+Dockerfile*
+docker-compose*.yml
+.docker/
+
+# Misc
+*.bak
+*.backup
+.cache/
+.coverage
+htmlcov/
