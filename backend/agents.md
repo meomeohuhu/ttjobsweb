@@ -14,8 +14,9 @@
 
 # Commands
 
-- Build: ./gradlew build
-- Test: ./gradlew test
+- Build: ./mvnw verify
+- Test: ./mvnw test
+- Run: ./mvnw spring-boot:run
 
 # Constraints
 
