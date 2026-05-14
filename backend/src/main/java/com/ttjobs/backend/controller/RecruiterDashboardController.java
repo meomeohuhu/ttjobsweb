@@ -10,6 +10,7 @@ import com.ttjobs.backend.dto.RecruiterApplicationDetailDTO;
 import com.ttjobs.backend.dto.RecruiterActivityLogDTO;
 import com.ttjobs.backend.dto.RecruiterCompanyDTO;
 import com.ttjobs.backend.dto.RecruiterJobDTO;
+import com.ttjobs.backend.dto.RecruiterWorkspaceDTO;
 import com.ttjobs.backend.dto.RecruiterReportDTO;
 import com.ttjobs.backend.dto.RecruitmentCampaignDTO;
 import com.ttjobs.backend.dto.RecruitmentCampaignRequest;
@@ -39,6 +40,11 @@ public class RecruiterDashboardController {
     @GetMapping("/dashboard")
     public RecruiterDashboardDTO getDashboard() {
         return recruiterDashboardService.getDashboard();
+    }
+
+    @GetMapping("/workspace")
+    public RecruiterWorkspaceDTO getWorkspaceSummary() {
+        return recruiterWorkspaceService.getWorkspaceSummary();
     }
 
     @GetMapping("/companies")
