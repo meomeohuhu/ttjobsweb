@@ -64,6 +64,9 @@ public class JobService {
     public List<JobDTO> getPublicJobs(String keyword, String category, String location, String companyName,
                                       String jobType, String experienceLevel, BigDecimal salaryMin,
                                       BigDecimal salaryMax, String sort, Integer page, Integer size) {
+        if (salaryMin != null && salaryMax != null && salaryMin.compareTo(salaryMax) > 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "salaryMin cannot be greater than salaryMax");
+        }
         boolean hasFilters = hasText(keyword) || hasText(category) || hasText(location) || hasText(companyName)
                 || hasText(jobType) || hasText(experienceLevel) || salaryMin != null || salaryMax != null
                 || hasText(sort) || page != null || size != null;
@@ -286,6 +289,10 @@ public class JobService {
                                    String jobType, String experienceLevel, String status,
                                    BigDecimal salaryMin, BigDecimal salaryMax, List<String> skills,
                                    String sort, Integer page, Integer size) {
+        if (salaryMin != null && salaryMax != null && salaryMin.compareTo(salaryMax) > 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "salaryMin cannot be greater than salaryMax");
+        }
+
         String normalizedStatus = normalizeJobStatus(status, OPEN);
         int safePage = page == null ? 0 : Math.max(page, 0);
         int safeSize = size == null ? 20 : Math.max(1, Math.min(size, 100));
@@ -336,13 +343,15 @@ public class JobService {
                     Sort.Order.desc("salaryMax").nullsLast(),
                     Sort.Order.desc("salary").nullsLast(),
                     Sort.Order.desc("salaryMin").nullsLast(),
-                    Sort.Order.desc("postedDate").nullsLast()
+                    Sort.Order.desc("postedDate").nullsLast(),
+                    Sort.Order.desc("id")
             );
             case "salary_low", "salary_asc" -> Sort.by(
                     Sort.Order.asc("salaryMin").nullsLast(),
                     Sort.Order.asc("salary").nullsLast(),
                     Sort.Order.asc("salaryMax").nullsLast(),
-                    Sort.Order.desc("postedDate").nullsLast()
+                    Sort.Order.desc("postedDate").nullsLast(),
+                    Sort.Order.desc("id")
             );
             default -> Sort.by(Sort.Order.desc("postedDate").nullsLast(), Sort.Order.desc("id"));
         };

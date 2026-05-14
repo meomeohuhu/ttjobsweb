@@ -207,4 +207,28 @@ class JobControllerApiTest {
                 .andExpect(jsonPath("$[0].id").value(9))
                 .andExpect(jsonPath("$[0].title").value("Company Job"));
     }
+
+    @Test
+    void searchJobs_shouldReturnBadRequest_whenSalaryMinGreaterThanSalaryMax() throws Exception {
+        when(jobService.searchJobs(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenThrow(new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "salaryMin cannot be greater than salaryMax"));
+
+        mockMvc.perform(get("/api/jobs/search")
+                        .param("salaryMin", "5000")
+                        .param("salaryMax", "2000"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("salaryMin cannot be greater than salaryMax"));
+    }
+
+    @Test
+    void getPublicJobs_shouldReturnBadRequest_whenSalaryMinGreaterThanSalaryMax() throws Exception {
+        when(jobService.getPublicJobs(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenThrow(new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "salaryMin cannot be greater than salaryMax"));
+
+        mockMvc.perform(get("/api/jobs")
+                        .param("salaryMin", "5000")
+                        .param("salaryMax", "2000"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("salaryMin cannot be greater than salaryMax"));
+    }
 }
