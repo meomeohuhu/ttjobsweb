@@ -6,7 +6,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.ttjobs.backend.dto.AuthResponseDTO;
 import com.ttjobs.backend.dto.RegisterRequest;
+import com.ttjobs.backend.dto.UserDTO;
 import com.ttjobs.backend.entity.User;
 import com.ttjobs.backend.repository.UserRepository;
 
@@ -22,7 +24,7 @@ public class UserService {
     @Autowired
     private RecruiterActivityLogService recruiterActivityLogService;
 
-    public User register(RegisterRequest request) {
+    public UserDTO register(RegisterRequest request) {
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
             throw new RuntimeException("Email already exists");
         }
@@ -37,10 +39,16 @@ public class UserService {
         // Default role for new accounts if not provided.
         user.setRole(User.Role.CANDIDATE);
 
-        return userRepository.save(user);
+        User savedUser = userRepository.save(user);
+        UserDTO dto = new UserDTO();
+        dto.setId(savedUser.getId());
+        dto.setName(savedUser.getName());
+        dto.setEmail(savedUser.getEmail());
+        dto.setRole(savedUser.getRole().name());
+        return dto;
     }
 
-    public String login(String email, String password) {
+    public AuthResponseDTO login(String email, String password) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -51,6 +59,7 @@ public class UserService {
         }
 
         recruiterActivityLogService.logLoginSuccess(user);
-        return jwtService.generateToken(user.getEmail(), user.getRole().name());
+        String token = jwtService.generateToken(user.getEmail(), user.getRole().name());
+        return new AuthResponseDTO(token);
     }
 }
