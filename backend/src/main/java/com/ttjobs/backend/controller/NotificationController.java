@@ -5,6 +5,7 @@ import com.ttjobs.backend.dto.NotificationPreferenceDTO;
 import com.ttjobs.backend.dto.NotificationPreferenceRequest;
 import com.ttjobs.backend.service.NotificationService;
 import com.ttjobs.backend.service.NotificationPreferenceService;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -58,7 +59,7 @@ public class NotificationController {
     }
 
     @PutMapping("/preferences")
-    public NotificationPreferenceDTO updatePreferences(@RequestBody NotificationPreferenceRequest request) {
+    public NotificationPreferenceDTO updatePreferences(@Valid @RequestBody NotificationPreferenceRequest request) {
         return preferenceService.updateMyPreferences(request);
     }
 }
