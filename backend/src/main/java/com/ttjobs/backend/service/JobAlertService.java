@@ -6,7 +6,6 @@ import com.ttjobs.backend.entity.JobNeedPreference;
 import com.ttjobs.backend.entity.NotificationPreference;
 import com.ttjobs.backend.entity.User;
 import com.ttjobs.backend.repository.JobAlertHistoryRepository;
-import com.ttjobs.backend.repository.JobNeedPreferenceRepository;
 import com.ttjobs.backend.repository.JobRepository;
 import com.ttjobs.backend.repository.JobSpecifications;
 import com.ttjobs.backend.repository.NotificationPreferenceRepository;
@@ -30,8 +29,6 @@ public class JobAlertService {
 
     @Autowired
     private UserRepository userRepository;
-    @Autowired
-    private JobNeedPreferenceRepository jobNeedPreferenceRepository;
     @Autowired
     private NotificationPreferenceRepository notificationPreferenceRepository;
     @Autowired
@@ -58,7 +55,7 @@ public class JobAlertService {
             if (!isEligibleForEmailAlerts(user)) {
                 continue;
             }
-            JobNeedPreference preference = jobNeedPreferenceRepository.findById(user.getId()).orElse(null);
+            JobNeedPreference preference = jobNeedPreferenceService.getOrCreate(user.getId());
             if (!jobNeedPreferenceService.hasConfiguredCriteria(preference)) {
                 continue;
             }

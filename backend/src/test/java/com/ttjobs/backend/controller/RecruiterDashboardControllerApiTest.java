@@ -1,10 +1,10 @@
 package com.ttjobs.backend.controller;
 
-import com.ttjobs.backend.dto.RecruiterDashboardDTO;
-import com.ttjobs.backend.dto.RecruiterApplicationDetailDTO;
-import com.ttjobs.backend.dto.RecruiterActivityLogDTO;
-import com.ttjobs.backend.dto.RecruiterCompanyDTO;
-import com.ttjobs.backend.dto.RecruiterJobDTO;
+import com.ttjobs.backend.dto.recruiter.RecruiterDashboardDTO;
+import com.ttjobs.backend.dto.recruiter.RecruiterApplicationDetailDTO;
+import com.ttjobs.backend.dto.recruiter.RecruiterActivityLogDTO;
+import com.ttjobs.backend.dto.recruiter.RecruiterCompanyDTO;
+import com.ttjobs.backend.dto.recruiter.RecruiterJobDTO;
 import com.ttjobs.backend.service.JwtService;
 import com.ttjobs.backend.service.RecruiterDashboardService;
 import com.ttjobs.backend.service.RecruiterWorkspaceService;
@@ -61,6 +61,7 @@ class RecruiterDashboardControllerApiTest {
         RecruiterCompanyDTO dto = new RecruiterCompanyDTO();
         dto.setId(10L);
         dto.setName("Acme");
+        dto.setVerificationStatus("VERIFIED");
         dto.setOpenJobCount(2L);
 
         when(recruiterWorkspaceService.getManagedCompanies()).thenReturn(List.of(dto));
@@ -69,6 +70,7 @@ class RecruiterDashboardControllerApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(10))
                 .andExpect(jsonPath("$[0].name").value("Acme"))
+                .andExpect(jsonPath("$[0].verificationStatus").value("VERIFIED"))
                 .andExpect(jsonPath("$[0].openJobCount").value(2));
     }
 
@@ -123,3 +125,4 @@ class RecruiterDashboardControllerApiTest {
                 .andExpect(jsonPath("$[0].title").value("Tạo job mới"));
     }
 }
+

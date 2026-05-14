@@ -1,15 +1,15 @@
 package com.ttjobs.backend.controller;
 
-import com.ttjobs.backend.dto.CandidateDashboardDTO;
-import com.ttjobs.backend.dto.UserCvDTO;
-import com.ttjobs.backend.dto.UserAvatarDTO;
+import com.ttjobs.backend.dto.user.CandidateDashboardDTO;
+import com.ttjobs.backend.dto.user.UserCvDTO;
+import com.ttjobs.backend.dto.user.UserAvatarDTO;
 import com.ttjobs.backend.service.CandidateDashboardService;
 import com.ttjobs.backend.service.JwtService;
 import com.ttjobs.backend.service.UserAvatarService;
 import com.ttjobs.backend.service.UserCvService;
 import com.ttjobs.backend.service.UserInterviewService;
 import com.ttjobs.backend.service.UserProfileService;
-import com.ttjobs.backend.dto.UserProfileDTO;
+import com.ttjobs.backend.dto.user.UserProfileDTO;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -181,3 +181,4 @@ class UserControllerApiTest {
                 .andExpect(status().isOk());
     }
 }
+

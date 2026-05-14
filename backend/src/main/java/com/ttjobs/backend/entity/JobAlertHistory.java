@@ -28,6 +28,8 @@ public class JobAlertHistory {
     private Long userId;
     @Column(name = "job_id", nullable = false)
     private Long jobId;
+    @Column(name = "saved_search_id")
+    private Long savedSearchId;
     @Column(name = "sent_at", nullable = false)
     private LocalDateTime sentAt;
 

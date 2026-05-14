@@ -2,7 +2,7 @@ package com.ttjobs.backend.controller;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ttjobs.backend.dto.SalaryBenchmarkDTO;
+import com.ttjobs.backend.dto.tool.SalaryBenchmarkDTO;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -39,3 +39,4 @@ public class SalaryBenchmarkController {
         return query == null || query.isBlank() || value.equalsIgnoreCase(query.trim());
     }
 }
+

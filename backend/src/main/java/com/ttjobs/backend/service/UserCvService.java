@@ -2,7 +2,8 @@ package com.ttjobs.backend.service;
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
-import com.ttjobs.backend.dto.UserCvDTO;
+import com.ttjobs.backend.dto.user.UserCvDTO;
+import com.ttjobs.backend.dto.user.UserCvTextDTO;
 import com.ttjobs.backend.entity.User;
 import com.ttjobs.backend.entity.UserCv;
 import com.ttjobs.backend.repository.UserCvRepository;
@@ -63,12 +64,12 @@ public class UserCvService {
                 .toList();
     }
 
-    public com.ttjobs.backend.dto.UserCvTextDTO getMyCvText() {
+    public UserCvTextDTO getMyCvText() {
         User currentUser = authContextService.requireCurrentUser();
         return toTextDto(currentUser);
     }
 
-    public com.ttjobs.backend.dto.UserCvTextDTO extractMyCvText() {
+    public UserCvTextDTO extractMyCvText() {
         User currentUser = authContextService.requireCurrentUser();
         if (currentUser.getCvUrl() == null || currentUser.getCvUrl().isBlank()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "CV not found");
@@ -259,8 +260,8 @@ public class UserCvService {
         return dto;
     }
 
-    private com.ttjobs.backend.dto.UserCvTextDTO toTextDto(User user) {
-        com.ttjobs.backend.dto.UserCvTextDTO dto = new com.ttjobs.backend.dto.UserCvTextDTO();
+    private UserCvTextDTO toTextDto(User user) {
+        UserCvTextDTO dto = new UserCvTextDTO();
         dto.setUserId(user.getId());
         dto.setCvText(user.getCvText());
         return dto;
@@ -364,3 +365,4 @@ public class UserCvService {
         return output.toByteArray();
     }
 }
+

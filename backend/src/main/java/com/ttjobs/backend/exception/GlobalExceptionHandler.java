@@ -52,12 +52,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, String>> handleRuntime(RuntimeException ex) {
-        HttpStatus status = "Email already exists".equals(ex.getMessage())
-                ? HttpStatus.CONFLICT
-                : HttpStatus.BAD_REQUEST;
-
         Map<String, String> body = new HashMap<>();
-        body.put("message", ex.getMessage());
-        return ResponseEntity.status(status).body(body);
+        body.put("message", ex.getMessage() != null ? ex.getMessage() : "Request failed");
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 }

@@ -1,6 +1,6 @@
 package com.ttjobs.backend.service;
 
-import com.ttjobs.backend.dto.InterviewScheduleDTO;
+import com.ttjobs.backend.dto.interview.InterviewScheduleDTO;
 import com.ttjobs.backend.entity.InterviewSchedule;
 import com.ttjobs.backend.entity.JobApplication;
 import com.ttjobs.backend.entity.User;
@@ -54,3 +54,4 @@ public class UserInterviewService {
         return dto;
     }
 }
+

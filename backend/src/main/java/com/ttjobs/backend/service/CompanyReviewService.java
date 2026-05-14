@@ -1,8 +1,8 @@
 package com.ttjobs.backend.service;
 
-import com.ttjobs.backend.dto.CompanyReviewDTO;
-import com.ttjobs.backend.dto.CompanyReviewRequest;
-import com.ttjobs.backend.dto.CompanyReviewSummaryDTO;
+import com.ttjobs.backend.dto.company.CompanyReviewDTO;
+import com.ttjobs.backend.dto.company.CompanyReviewRequest;
+import com.ttjobs.backend.dto.company.CompanyReviewSummaryDTO;
 import com.ttjobs.backend.entity.Company;
 import com.ttjobs.backend.entity.CompanyReview;
 import com.ttjobs.backend.entity.User;
@@ -105,4 +105,5 @@ public class CompanyReviewService {
         return value.trim();
     }
 }
+
 

@@ -1,9 +1,11 @@
 package com.ttjobs.backend.controller;
 
-import com.ttjobs.backend.dto.ConversationDTO;
-import com.ttjobs.backend.dto.CreateConversationRequest;
-import com.ttjobs.backend.dto.MessageDTO;
-import com.ttjobs.backend.dto.SendMessageRequest;
+import com.ttjobs.backend.dto.conversation.ConversationDTO;
+import com.ttjobs.backend.dto.conversation.CreateConversationRequest;
+import com.ttjobs.backend.dto.conversation.MessageDTO;
+import com.ttjobs.backend.dto.conversation.ReadReceiptDTO;
+import com.ttjobs.backend.dto.conversation.SendMessageRequest;
+import com.ttjobs.backend.dto.conversation.TypingRequest;
 import com.ttjobs.backend.service.ConversationService;
 import com.ttjobs.backend.service.MessageService;
 import jakarta.servlet.http.HttpServletResponse;
@@ -63,6 +65,16 @@ public class ConversationController {
         return messageService.getMessages(conversationId, page, size);
     }
 
+    @PostMapping("/{conversationId}/read")
+    public ReadReceiptDTO markRead(@PathVariable Long conversationId) {
+        return messageService.markConversationRead(conversationId);
+    }
+
+    @PostMapping("/{conversationId}/typing")
+    public void typing(@PathVariable Long conversationId, @RequestBody(required = false) TypingRequest request) {
+        messageService.publishTyping(conversationId, request);
+    }
+
     @GetMapping("/{conversationId}/attachments/{attachmentId}/download")
     public void downloadAttachment(
             @PathVariable Long conversationId,
@@ -71,3 +83,4 @@ public class ConversationController {
         messageService.downloadAttachment(conversationId, attachmentId, response);
     }
 }
+

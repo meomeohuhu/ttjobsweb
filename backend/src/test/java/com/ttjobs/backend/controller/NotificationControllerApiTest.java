@@ -1,6 +1,6 @@
 package com.ttjobs.backend.controller;
 
-import com.ttjobs.backend.dto.NotificationDTO;
+import com.ttjobs.backend.dto.notification.NotificationDTO;
 import com.ttjobs.backend.service.JwtService;
 import com.ttjobs.backend.service.NotificationPreferenceService;
 import com.ttjobs.backend.service.NotificationService;
@@ -80,3 +80,4 @@ class NotificationControllerApiTest {
                 .andExpect(status().isOk());
     }
 }
+

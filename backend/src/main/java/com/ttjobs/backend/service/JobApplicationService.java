@@ -2,7 +2,8 @@ package com.ttjobs.backend.service;
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
-import com.ttjobs.backend.dto.JobApplicationDTO;
+import com.ttjobs.backend.dto.application.ApplicationTimelineDTO;
+import com.ttjobs.backend.dto.application.JobApplicationDTO;
 import com.ttjobs.backend.entity.CompanyMember;
 import com.ttjobs.backend.entity.Job;
 import com.ttjobs.backend.entity.JobApplication;
@@ -87,6 +88,8 @@ public class JobApplicationService {
     private EmailService emailService;
     @Autowired
     private ObjectProvider<Cloudinary> cloudinaryProvider;
+    @Autowired(required = false)
+    private AiMonitoringService aiMonitoringService;
     @Autowired
     private CvTextExtractionService cvTextExtractionService;
     @Autowired
@@ -229,6 +232,7 @@ public class JobApplicationService {
             // Send email to company owner about the new application.
             emailService.sendNewApplication(job.getCompany().getCreatedBy(), user, job);
         }
+        recordAiEvent(user, job, "application_created", saved.getCvTextSnapshot());
         return convertToDTO(saved);
     }
 
@@ -278,6 +282,11 @@ public class JobApplicationService {
                 "APPLICATION_STATUS_UPDATED"
         );
         emailService.sendApplicationStatusChanged(saved.getUser(), saved.getJob(), targetStatus);
+        if (SHORTLISTED.equals(targetStatus)) {
+            recordAiEvent(saved.getUser(), saved.getJob(), "recruiter_shortlisted", saved.getCvTextSnapshot());
+        } else if (REJECTED.equals(targetStatus)) {
+            recordAiEvent(saved.getUser(), saved.getJob(), "recruiter_rejected", saved.getCvTextSnapshot());
+        }
         return convertToDTO(saved);
     }
 
@@ -307,7 +316,7 @@ public class JobApplicationService {
         return convertToDTO(saved);
     }
 
-    public List<com.ttjobs.backend.dto.ApplicationTimelineDTO> getApplicationTimeline(Long applicationId) {
+    public List<ApplicationTimelineDTO> getApplicationTimeline(Long applicationId) {
         User currentUser = authContextService.requireCurrentUser();
         JobApplication application = jobApplicationRepository.findById(applicationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Application not found"));
@@ -320,8 +329,7 @@ public class JobApplicationService {
         return statusAuditRepository.findByApplicationIdOrderByChangedAtAsc(applicationId)
                 .stream()
                 .map(audit -> {
-                    com.ttjobs.backend.dto.ApplicationTimelineDTO dto =
-                            new com.ttjobs.backend.dto.ApplicationTimelineDTO();
+                    ApplicationTimelineDTO dto = new ApplicationTimelineDTO();
                     dto.setFromStatus(audit.getFromStatus());
                     dto.setToStatus(audit.getToStatus());
                     dto.setChangedAt(audit.getChangedAt());
@@ -649,4 +657,20 @@ public class JobApplicationService {
         }
         return output.toByteArray();
     }
+
+    private void recordAiEvent(User user, Job job, String eventType, String cvText) {
+        if (aiMonitoringService != null) {
+            aiMonitoringService.recordMatchEvent(
+                    user == null ? null : user.getId(),
+                    job,
+                    eventType,
+                    cvText,
+                    job == null ? null : job.getDescription(),
+                    null,
+                    null,
+                    "application-flow"
+            );
+        }
+    }
 }
+

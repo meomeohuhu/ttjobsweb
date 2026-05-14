@@ -1,7 +1,7 @@
 package com.ttjobs.backend.service;
 
-import com.ttjobs.backend.dto.MessageDTO;
-import com.ttjobs.backend.dto.SendMessageRequest;
+import com.ttjobs.backend.dto.conversation.MessageDTO;
+import com.ttjobs.backend.dto.conversation.SendMessageRequest;
 import com.ttjobs.backend.entity.Conversation;
 import com.ttjobs.backend.entity.ConversationMember;
 import com.ttjobs.backend.entity.Message;
@@ -39,6 +39,8 @@ class MessageServiceTest {
     private AuthContextService authContextService;
     @Mock
     private NotificationService notificationService;
+    @Mock
+    private RealtimeEventPublisher realtimeEventPublisher;
 
     @InjectMocks
     private MessageService messageService;
@@ -88,6 +90,7 @@ class MessageServiceTest {
 
         MessageDTO dto = messageService.sendMessage(10L, request);
         assertEquals(20L, dto.getId());
+        verify(realtimeEventPublisher).publish(eq("/topic/conversations/10"), any(MessageDTO.class));
         verify(notificationService).createNotification(
                 eq(other),
                 anyString(),
@@ -111,3 +114,4 @@ class MessageServiceTest {
         return user;
     }
 }
+

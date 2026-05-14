@@ -2,7 +2,7 @@ package com.ttjobs.backend.service;
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.Uploader;
-import com.ttjobs.backend.dto.UserAvatarDTO;
+import com.ttjobs.backend.dto.user.UserAvatarDTO;
 import com.ttjobs.backend.entity.User;
 import com.ttjobs.backend.repository.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -99,3 +99,4 @@ class UserAvatarServiceTest {
         return user;
     }
 }
+

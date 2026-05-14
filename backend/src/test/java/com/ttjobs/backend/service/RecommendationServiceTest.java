@@ -1,12 +1,15 @@
 package com.ttjobs.backend.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ttjobs.backend.dto.JobDTO;
+import com.ttjobs.backend.dto.ai.AiJobMatchDTO;
+import com.ttjobs.backend.dto.ai.AiMatchPredictionDTO;
+import com.ttjobs.backend.dto.job.JobDTO;
 import com.ttjobs.backend.entity.JobNeedPreference;
 import com.ttjobs.backend.entity.Job;
 import com.ttjobs.backend.entity.User;
 import com.ttjobs.backend.repository.JobRepository;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -22,6 +25,7 @@ import org.springframework.web.client.RestClientException;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -192,4 +196,93 @@ class RecommendationServiceTest {
         assertEquals("Sales Executive", result.get(0).getTitle());
     }
 
+    @Test
+    void recommendByJobNeeds_shouldUseMatchClassifierForTopJobs() {
+        User candidate = new User();
+        candidate.setId(7L);
+        candidate.setRole(User.Role.CANDIDATE);
+        candidate.setCvText("Java Spring Boot PostgreSQL backend");
+
+        JobNeedPreference preference = new JobNeedPreference();
+        preference.setUserId(7L);
+        preference.setDesiredTitle("Backend");
+
+        Job job = new Job();
+        job.setId(40L);
+        job.setTitle("Java Backend Engineer");
+        job.setStatus("open");
+        job.setCategory("INFORMATION-TECHNOLOGY");
+        job.setDescription("Build APIs with Java Spring Boot and PostgreSQL");
+
+        AiJobMatchDTO aiMatch = new AiJobMatchDTO();
+        aiMatch.setJobId(40L);
+        aiMatch.setScore(70);
+
+        AiMatchPredictionDTO prediction = new AiMatchPredictionDTO();
+        prediction.setLabel("match");
+        prediction.setConfidence(0.8);
+        prediction.setProbabilities(Map.of("match", 0.8, "partial_match", 0.15, "not_match", 0.05));
+
+        when(authContextService.requireCurrentUser()).thenReturn(candidate);
+        when(jobNeedPreferenceService.getOrCreate(7L)).thenReturn(preference);
+        when(jobNeedPreferenceService.hasConfiguredCriteria(preference)).thenReturn(true);
+        when(jobRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(List.of(job)));
+        when(restTemplate.exchange(any(org.springframework.http.RequestEntity.class), eq(AiJobMatchDTO[].class)))
+                .thenReturn(ResponseEntity.ok(new AiJobMatchDTO[]{aiMatch}));
+        when(restTemplate.exchange(any(org.springframework.http.RequestEntity.class), eq(AiMatchPredictionDTO.class)))
+                .thenReturn(ResponseEntity.ok(prediction));
+
+        ReflectionTestUtils.setField(recommendationService, "aiBaseUrl", "http://ai");
+
+        List<JobDTO> result = recommendationService.recommendByJobNeeds();
+
+        assertEquals(1, result.size());
+        assertEquals("match", result.get(0).getMatchLabel());
+        assertEquals(0.8, result.get(0).getMatchConfidence());
+        assertEquals(87, result.get(0).getMatchScore());
+    }
+
+    @Test
+    void recommendByJobNeeds_shouldFallbackToEmbeddingScoreWhenMatchClassifierFails() {
+        User candidate = new User();
+        candidate.setId(8L);
+        candidate.setRole(User.Role.CANDIDATE);
+        candidate.setCvText("Java Spring Boot PostgreSQL backend");
+
+        JobNeedPreference preference = new JobNeedPreference();
+        preference.setUserId(8L);
+        preference.setDesiredTitle("Backend");
+
+        Job job = new Job();
+        job.setId(41L);
+        job.setTitle("Java Backend Engineer");
+        job.setStatus("open");
+        job.setCategory("INFORMATION-TECHNOLOGY");
+        job.setDescription("Build APIs with Java Spring Boot and PostgreSQL");
+
+        AiJobMatchDTO aiMatch = new AiJobMatchDTO();
+        aiMatch.setJobId(41L);
+        aiMatch.setScore(70);
+
+        when(authContextService.requireCurrentUser()).thenReturn(candidate);
+        when(jobNeedPreferenceService.getOrCreate(8L)).thenReturn(preference);
+        when(jobNeedPreferenceService.hasConfiguredCriteria(preference)).thenReturn(true);
+        when(jobRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(List.of(job)));
+        when(restTemplate.exchange(any(org.springframework.http.RequestEntity.class), eq(AiJobMatchDTO[].class)))
+                .thenReturn(ResponseEntity.ok(new AiJobMatchDTO[]{aiMatch}));
+        when(restTemplate.exchange(any(org.springframework.http.RequestEntity.class), eq(AiMatchPredictionDTO.class)))
+                .thenThrow(new RestClientException("classifier down"));
+
+        ReflectionTestUtils.setField(recommendationService, "aiBaseUrl", "http://ai");
+
+        List<JobDTO> result = recommendationService.recommendByJobNeeds();
+
+        assertEquals(1, result.size());
+        assertEquals(null, result.get(0).getMatchLabel());
+        assertEquals(70, result.get(0).getMatchScore());
+    }
+
 }
+

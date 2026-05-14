@@ -1,6 +1,6 @@
 package com.ttjobs.backend.controller;
 
-import com.ttjobs.backend.dto.CompanyFollowStatusDTO;
+import com.ttjobs.backend.dto.company.CompanyFollowStatusDTO;
 import com.ttjobs.backend.service.CompanyFollowService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,3 +20,4 @@ public class CompanyFollowStatusController {
         return companyFollowService.getFollowStatus(companyId);
     }
 }
+

@@ -2,7 +2,7 @@ package com.ttjobs.backend.service;
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.Uploader;
-import com.ttjobs.backend.dto.UserCvDTO;
+import com.ttjobs.backend.dto.user.UserCvDTO;
 import com.ttjobs.backend.entity.User;
 import com.ttjobs.backend.entity.UserCv;
 import com.ttjobs.backend.repository.UserCvRepository;
@@ -125,3 +125,4 @@ class UserCvServiceTest {
         return user;
     }
 }
+

@@ -2,9 +2,11 @@ package com.ttjobs.backend.service;
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
-import com.ttjobs.backend.dto.MessageAttachmentDTO;
-import com.ttjobs.backend.dto.MessageDTO;
-import com.ttjobs.backend.dto.SendMessageRequest;
+import com.ttjobs.backend.dto.conversation.MessageAttachmentDTO;
+import com.ttjobs.backend.dto.conversation.MessageDTO;
+import com.ttjobs.backend.dto.conversation.ReadReceiptDTO;
+import com.ttjobs.backend.dto.conversation.SendMessageRequest;
+import com.ttjobs.backend.dto.conversation.TypingRequest;
 import com.ttjobs.backend.entity.Conversation;
 import com.ttjobs.backend.entity.ConversationMember;
 import com.ttjobs.backend.entity.Message;
@@ -27,7 +29,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
@@ -50,7 +51,7 @@ public class MessageService {
     @Autowired
     private ObjectProvider<Cloudinary> cloudinaryProvider;
     @Autowired
-    private SimpMessagingTemplate messagingTemplate;
+    private RealtimeEventPublisher realtimeEventPublisher;
 
     public MessageDTO sendMessage(Long conversationId, SendMessageRequest request) {
         String content = request == null ? null : request.getContent();
@@ -98,6 +99,37 @@ public class MessageService {
         streamAttachment(attachment, response);
     }
 
+    public ReadReceiptDTO markConversationRead(Long conversationId) {
+        User currentUser = authContextService.requireCurrentUser();
+        ConversationMember currentMembership = conversationMemberRepository
+                .findByIdConversationIdAndIdUserId(conversationId, currentUser.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a member of this conversation"));
+        LocalDateTime readAt = LocalDateTime.now();
+        currentMembership.setLastReadAt(readAt);
+        conversationMemberRepository.save(currentMembership);
+
+        ReadReceiptDTO dto = new ReadReceiptDTO();
+        dto.setConversationId(conversationId);
+        dto.setUserId(currentUser.getId());
+        dto.setLastReadAt(readAt);
+        publishConversationEvent(conversationId, "conversation_read", currentUser.getId(), dto);
+        publishUserConversationEvents(conversationId, currentUser.getId(), dto);
+        return dto;
+    }
+
+    public void publishTyping(Long conversationId, TypingRequest request) {
+        User currentUser = authContextService.requireCurrentUser();
+        if (!conversationMemberRepository.existsByIdConversationIdAndIdUserId(conversationId, currentUser.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a member of this conversation");
+        }
+        boolean typing = request != null && Boolean.TRUE.equals(request.getTyping());
+        publishConversationEvent(conversationId, typing ? "typing_started" : "typing_stopped", currentUser.getId(), Map.of(
+                "conversationId", conversationId,
+                "userId", currentUser.getId(),
+                "typing", typing
+        ));
+    }
+
     private MessageDTO createMessage(Long conversationId, String content, String type, MultipartFile file) {
         User currentUser = authContextService.requireCurrentUser();
         Conversation conversation = conversationRepository.findById(conversationId)
@@ -125,10 +157,35 @@ public class MessageService {
         Message savedMessage = messageRepository.save(message);
         notifyOtherMembers(conversationId, currentUser, savedMessage);
         MessageDTO dto = toDto(savedMessage);
-        if (messagingTemplate != null) {
-            messagingTemplate.convertAndSend("/topic/conversations/" + conversationId, dto);
-        }
+        realtimeEventPublisher.publish("/topic/conversations/" + conversationId, dto);
+        publishConversationEvent(conversationId, "message_created", currentUser.getId(), dto);
+        publishUserConversationEvents(conversationId, currentUser.getId(), dto);
         return dto;
+    }
+
+    private void publishConversationEvent(Long conversationId, String type, Long actorId, Object payload) {
+        realtimeEventPublisher.publish("/topic/conversations/" + conversationId, Map.of(
+                "type", type,
+                "conversationId", conversationId,
+                "actorId", actorId,
+                "payload", payload,
+                "occurredAt", LocalDateTime.now().toString()
+        ));
+    }
+
+    private void publishUserConversationEvents(Long conversationId, Long actorId, Object payload) {
+        for (ConversationMember member : conversationMemberRepository.findByIdConversationId(conversationId)) {
+            if (member.getUser() == null) {
+                continue;
+            }
+            realtimeEventPublisher.publish("/topic/users/" + member.getUser().getId() + "/conversations", Map.of(
+                    "type", "conversation_updated",
+                    "conversationId", conversationId,
+                    "actorId", actorId,
+                    "payload", payload,
+                    "occurredAt", LocalDateTime.now().toString()
+            ));
+        }
     }
 
     private void markConversationAsRead(ConversationMember currentMembership, List<MessageDTO> messages) {
@@ -300,3 +357,4 @@ public class MessageService {
         };
     }
 }
+

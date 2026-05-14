@@ -1,7 +1,7 @@
 package com.ttjobs.backend.service;
 
-import com.ttjobs.backend.dto.ToolSessionRequest;
-import com.ttjobs.backend.dto.ToolSessionResponse;
+import com.ttjobs.backend.dto.tool.ToolSessionRequest;
+import com.ttjobs.backend.dto.tool.ToolSessionResponse;
 import com.ttjobs.backend.entity.User;
 import com.ttjobs.backend.entity.UserToolSession;
 import com.ttjobs.backend.repository.UserToolSessionRepository;
@@ -73,3 +73,4 @@ public class ToolSessionService {
         return dto;
     }
 }
+

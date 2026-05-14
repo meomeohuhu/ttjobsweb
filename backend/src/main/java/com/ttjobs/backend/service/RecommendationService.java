@@ -1,11 +1,13 @@
 package com.ttjobs.backend.service;
 
-import com.ttjobs.backend.dto.AiPredictionDTO;
-import com.ttjobs.backend.dto.AiPredictionRequest;
-import com.ttjobs.backend.dto.AiJobCandidateDTO;
-import com.ttjobs.backend.dto.AiJobMatchDTO;
-import com.ttjobs.backend.dto.AiJobMatchRequest;
-import com.ttjobs.backend.dto.JobDTO;
+import com.ttjobs.backend.dto.ai.AiPredictionDTO;
+import com.ttjobs.backend.dto.ai.AiPredictionRequest;
+import com.ttjobs.backend.dto.ai.AiMatchPredictionDTO;
+import com.ttjobs.backend.dto.ai.AiMatchPredictionRequest;
+import com.ttjobs.backend.dto.ai.AiJobCandidateDTO;
+import com.ttjobs.backend.dto.ai.AiJobMatchDTO;
+import com.ttjobs.backend.dto.ai.AiJobMatchRequest;
+import com.ttjobs.backend.dto.job.JobDTO;
 import com.ttjobs.backend.entity.CandidateJobMatch;
 import com.ttjobs.backend.entity.JobNeedPreference;
 import com.ttjobs.backend.entity.Job;
@@ -38,6 +40,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.RequestEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.server.ResponseStatusException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,6 +93,8 @@ public class RecommendationService {
     private ObjectMapper objectMapper;
     @Autowired
     private RestTemplate restTemplate;
+    @Autowired(required = false)
+    private AiMonitoringService aiMonitoringService;
 
     @Value("${ttjobs.ai.base-url}")
     private String aiBaseUrl;
@@ -120,6 +125,18 @@ public class RecommendationService {
 
         List<AiPredictionDTO> predictions = fetchPredictions(cvText);
         return findJobsFromPredictions(predictions);
+    }
+
+    public void recordRecommendationInteraction(Long jobId, String eventType) {
+        User currentUser = authContextService.requireCurrentUser();
+        if (currentUser.getRole() != User.Role.CANDIDATE) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only candidate can record recommendation events");
+        }
+        Job job = jobRepository.findByIdAndDeletedAtIsNull(jobId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
+        String normalizedEvent = normalizeRecommendationEvent(eventType);
+        recordMatchEvent(currentUser.getId(), job, normalizedEvent, currentUser.getCvText(), buildJobText(job),
+                null, null, "user-action");
     }
 
     @Transactional
@@ -175,10 +192,16 @@ public class RecommendationService {
             return cacheJobNeedResult(cacheKey, List.of());
         }
 
+        String needText = buildNeedText(preference);
+        String cvText = currentUser.getCvText() == null || currentUser.getCvText().isBlank()
+                ? needText
+                : currentUser.getCvText();
+
         List<AiJobMatchDTO> aiMatches = fetchJobNeedMatches(preference, candidates);
         if (!aiMatches.isEmpty()) {
             Map<Long, Job> jobsById = candidates.stream()
                     .collect(Collectors.toMap(Job::getId, Function.identity()));
+            aiMatches = enrichWithMatchClassifier(currentUser.getId(), cvText, aiMatches, jobsById);
             List<JobDTO> result = aiMatches.stream()
                     .map(match -> {
                         Job job = jobsById.get(match.getJobId());
@@ -188,6 +211,7 @@ public class RecommendationService {
                     .limit(MAX_JOBS)
                     .collect(Collectors.toList());
             storeJobNeedMatches(currentUser.getId(), preference, aiMatches, jobsById);
+            recordShownEvents(currentUser.getId(), cvText, result, jobsById, aiMatches);
             return cacheJobNeedResult(cacheKey, result);
         }
 
@@ -198,6 +222,8 @@ public class RecommendationService {
                         Objects.requireNonNullElse(first.getMatchScore(), 0)))
                 .limit(MAX_JOBS)
                 .collect(Collectors.toList());
+        recordShownEvents(currentUser.getId(), cvText, result, candidates.stream()
+                .collect(Collectors.toMap(Job::getId, Function.identity())), List.of());
         return cacheJobNeedResult(cacheKey, result);
     }
 
@@ -317,6 +343,10 @@ public class RecommendationService {
             dto.setMatchReasons(reasons);
             dto.setMatchReason(String.join("; ", reasons));
             dto.setMatchScore(calculateFinalMatchScore(job, preference, aiMatch, reasons));
+            if (aiMatch != null) {
+                dto.setMatchLabel(aiMatch.getMatchLabel());
+                dto.setMatchConfidence(aiMatch.getMatchConfidence());
+            }
         }
         return dto;
     }
@@ -349,6 +379,7 @@ public class RecommendationService {
     }
 
     private List<AiJobMatchDTO> fetchJobNeedMatches(JobNeedPreference preference, List<Job> jobs) {
+        long startedAt = System.currentTimeMillis();
         try {
             AiJobMatchRequest request = new AiJobMatchRequest();
             request.setNeedText(buildNeedText(preference));
@@ -363,10 +394,119 @@ public class RecommendationService {
                     .body(request);
 
             AiJobMatchDTO[] response = restTemplate.exchange(entity, AiJobMatchDTO[].class).getBody();
+            recordAiCall("/ai/match-jobs", "SUCCESS", 200, startedAt, false, null, null);
             return response == null ? List.of() : List.of(response);
-        } catch (Exception ex) {
+        } catch (HttpStatusCodeException ex) {
+            recordAiCall("/ai/match-jobs", "ERROR", ex.getStatusCode().value(), startedAt, true, null, null);
             log.warn("AI job matching unavailable, using fallback recommendation scoring. cause={}", ex.toString());
             return List.of();
+        } catch (Exception ex) {
+            recordAiCall("/ai/match-jobs", "ERROR", null, startedAt, true, null, null);
+            log.warn("AI job matching unavailable, using fallback recommendation scoring. cause={}", ex.toString());
+            return List.of();
+        }
+    }
+
+    private List<AiJobMatchDTO> enrichWithMatchClassifier(
+            Long userId,
+            String cvText,
+            List<AiJobMatchDTO> matches,
+            Map<Long, Job> jobsById
+    ) {
+        return matches.stream()
+                .limit(50)
+                .map(match -> enrichSingleMatch(userId, cvText, match, jobsById.get(match.getJobId())))
+                .sorted((first, second) -> Integer.compare(
+                        Objects.requireNonNullElse(second.getScore(), 0),
+                        Objects.requireNonNullElse(first.getScore(), 0)))
+                .toList();
+    }
+
+    private AiJobMatchDTO enrichSingleMatch(Long userId, String cvText, AiJobMatchDTO match, Job job) {
+        if (job == null) {
+            return match;
+        }
+        String jobText = buildJobText(job);
+        AiMatchPredictionDTO prediction = fetchMatchPrediction(cvText, jobText);
+        if (prediction == null || prediction.getLabel() == null) {
+            return match;
+        }
+
+        int classifierScore = classifierScore(prediction);
+        int embeddingScore = Objects.requireNonNullElse(match.getScore(), classifierScore);
+        int finalScore = Math.max(1, Math.min(100, Math.round(classifierScore * 0.6f + embeddingScore * 0.4f)));
+        match.setScore(finalScore);
+        match.setMatchLabel(prediction.getLabel());
+        match.setMatchConfidence(prediction.getConfidence());
+
+        List<String> reasons = match.getReasons() == null ? new ArrayList<>() : new ArrayList<>(match.getReasons());
+        reasons.add(0, "AI classifier: " + prediction.getLabel());
+        match.setReasons(reasons);
+        recordMatchEvent(userId, job, "recommendation_scored", cvText, jobText,
+                prediction.getLabel(), finalScore, "predict-match");
+        return match;
+    }
+
+    private AiMatchPredictionDTO fetchMatchPrediction(String cvText, String jobText) {
+        long startedAt = System.currentTimeMillis();
+        try {
+            AiMatchPredictionRequest request = new AiMatchPredictionRequest();
+            request.setCvText(cvText);
+            request.setJobText(jobText);
+            RequestEntity<AiMatchPredictionRequest> entity = RequestEntity
+                    .post(aiBaseUrl + "/ai/predict-match")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(request);
+            AiMatchPredictionDTO response = restTemplate.exchange(entity, AiMatchPredictionDTO.class).getBody();
+            recordAiCall("/ai/predict-match", "SUCCESS", 200, startedAt, false,
+                    response == null ? null : response.getLabel(),
+                    response == null ? null : response.getConfidence());
+            return response;
+        } catch (HttpStatusCodeException ex) {
+            recordAiCall("/ai/predict-match", "ERROR", ex.getStatusCode().value(), startedAt, true, null, null);
+            return null;
+        } catch (Exception ex) {
+            recordAiCall("/ai/predict-match", "ERROR", null, startedAt, true, null, null);
+            return null;
+        }
+    }
+
+    private int classifierScore(AiMatchPredictionDTO prediction) {
+        double confidence = prediction.getConfidence() == null ? 0.0 : Math.max(0.0, Math.min(1.0, prediction.getConfidence()));
+        return switch (Objects.toString(prediction.getLabel(), "")) {
+            case "match" -> Math.round(90 + (float) confidence * 10);
+            case "partial_match" -> Math.round(55 + (float) confidence * 20);
+            case "not_match" -> Math.round((float) confidence * 35);
+            default -> 50;
+        };
+    }
+
+    private void recordAiCall(String endpoint, String status, Integer httpStatus, long startedAt,
+                              boolean fallbackUsed, String predictedLabel, Double confidence) {
+        if (aiMonitoringService != null) {
+            aiMonitoringService.recordAiCall(endpoint, status, httpStatus,
+                    System.currentTimeMillis() - startedAt, fallbackUsed, predictedLabel, confidence);
+        }
+    }
+
+    private void recordMatchEvent(Long userId, Job job, String eventType, String cvText,
+                                  String jobText, String predictedLabel, Integer predictedScore, String source) {
+        if (aiMonitoringService != null) {
+            aiMonitoringService.recordMatchEvent(userId, job, eventType, cvText, jobText, predictedLabel, predictedScore, source);
+        }
+    }
+
+    private void recordShownEvents(Long userId, String cvText, List<JobDTO> results,
+                                   Map<Long, Job> jobsById, List<AiJobMatchDTO> matches) {
+        Map<Long, AiJobMatchDTO> matchesByJobId = matches.stream()
+                .filter(match -> match.getJobId() != null)
+                .collect(Collectors.toMap(AiJobMatchDTO::getJobId, Function.identity(), (first, second) -> first));
+        for (JobDTO dto : results) {
+            Job job = jobsById.get(dto.getId());
+            AiJobMatchDTO match = matchesByJobId.get(dto.getId());
+            recordMatchEvent(userId, job, "recommendation_shown", cvText, job == null ? null : buildJobText(job),
+                    match == null ? dto.getMatchLabel() : match.getMatchLabel(),
+                    dto.getMatchScore(), match == null ? "fallback" : "recommendation");
         }
     }
 
@@ -510,6 +650,17 @@ public class RecommendationService {
         ));
     }
 
+    private String normalizeRecommendationEvent(String eventType) {
+        if (eventType == null || eventType.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "eventType is required");
+        }
+        String normalized = eventType.trim().toLowerCase(Locale.ROOT);
+        if (!List.of("recommendation_clicked", "candidate_ignored").contains(normalized)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported recommendation event");
+        }
+        return normalized;
+    }
+
     private String expandSkillContext(String skill) {
         if (skill == null || skill.isBlank()) {
             return "";
@@ -599,3 +750,4 @@ public class RecommendationService {
         return Objects.equals(first.trim().toLowerCase(Locale.ROOT), second.trim().toLowerCase(Locale.ROOT));
     }
 }
+

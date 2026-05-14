@@ -1,7 +1,7 @@
 package com.ttjobs.backend.controller;
 
-import com.ttjobs.backend.dto.JobNeedPreferenceDTO;
-import com.ttjobs.backend.dto.JobNeedPreferenceRequest;
+import com.ttjobs.backend.dto.job.JobNeedPreferenceDTO;
+import com.ttjobs.backend.dto.job.JobNeedPreferenceRequest;
 import com.ttjobs.backend.service.JobNeedPreferenceService;
 import com.ttjobs.backend.service.JwtService;
 import static org.mockito.ArgumentMatchers.any;
@@ -63,3 +63,4 @@ class JobNeedPreferenceControllerTest {
         verify(jobNeedPreferenceService).updateMyPreferences(any(JobNeedPreferenceRequest.class));
     }
 }
+

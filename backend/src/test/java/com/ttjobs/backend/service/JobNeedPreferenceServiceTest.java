@@ -1,9 +1,11 @@
 package com.ttjobs.backend.service;
 
-import com.ttjobs.backend.dto.JobNeedPreferenceRequest;
+import com.ttjobs.backend.dto.job.JobNeedPreferenceRequest;
 import com.ttjobs.backend.entity.JobNeedPreference;
+import com.ttjobs.backend.entity.SavedSearch;
 import com.ttjobs.backend.entity.User;
-import com.ttjobs.backend.repository.JobNeedPreferenceRepository;
+import com.ttjobs.backend.repository.SavedSearchRepository;
+import com.ttjobs.backend.repository.UserRepository;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -23,7 +25,10 @@ import static org.mockito.Mockito.when;
 class JobNeedPreferenceServiceTest {
 
     @Mock
-    private JobNeedPreferenceRepository jobNeedPreferenceRepository;
+    private SavedSearchRepository savedSearchRepository;
+
+    @Mock
+    private UserRepository userRepository;
 
     @Mock
     private AuthContextService authContextService;
@@ -35,8 +40,9 @@ class JobNeedPreferenceServiceTest {
     void getMyPreferences_shouldCreateDefaultForCandidate() {
         User candidate = user(1L, User.Role.CANDIDATE);
         when(authContextService.requireCurrentUser()).thenReturn(candidate);
-        when(jobNeedPreferenceRepository.findById(1L)).thenReturn(Optional.empty());
-        when(jobNeedPreferenceRepository.save(any(JobNeedPreference.class)))
+        when(savedSearchRepository.findFirstByUserIdAndNameOrderByUpdatedAtDesc(1L, "Nhu cau viec lam")).thenReturn(Optional.empty());
+        when(userRepository.findById(1L)).thenReturn(Optional.of(candidate));
+        when(savedSearchRepository.save(any(SavedSearch.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         assertEquals(false, jobNeedPreferenceService.getMyPreferences().getRemoteOnly());
@@ -45,9 +51,10 @@ class JobNeedPreferenceServiceTest {
     @Test
     void updateMyPreferences_shouldSaveCriteria() {
         User candidate = user(2L, User.Role.CANDIDATE);
-        JobNeedPreference preference = new JobNeedPreference();
-        preference.setUserId(2L);
-        preference.setRemoteOnly(false);
+        SavedSearch search = new SavedSearch();
+        search.setUser(candidate);
+        search.setName("Nhu cau viec lam");
+        search.setRemoteOnly(false);
 
         JobNeedPreferenceRequest request = new JobNeedPreferenceRequest();
         request.setDesiredTitle("Backend Engineer");
@@ -58,8 +65,8 @@ class JobNeedPreferenceServiceTest {
         request.setRemoteOnly(true);
 
         when(authContextService.requireCurrentUser()).thenReturn(candidate);
-        when(jobNeedPreferenceRepository.findById(2L)).thenReturn(Optional.of(preference));
-        when(jobNeedPreferenceRepository.save(preference)).thenReturn(preference);
+        when(savedSearchRepository.findFirstByUserIdAndNameOrderByUpdatedAtDesc(2L, "Nhu cau viec lam")).thenReturn(Optional.of(search));
+        when(savedSearchRepository.save(search)).thenReturn(search);
 
         var result = jobNeedPreferenceService.updateMyPreferences(request);
 
@@ -72,15 +79,16 @@ class JobNeedPreferenceServiceTest {
     @Test
     void updateMyPreferences_shouldRejectInvalidSalaryRange() {
         User candidate = user(3L, User.Role.CANDIDATE);
-        JobNeedPreference preference = new JobNeedPreference();
-        preference.setUserId(3L);
+        SavedSearch search = new SavedSearch();
+        search.setUser(candidate);
+        search.setName("Nhu cau viec lam");
 
         JobNeedPreferenceRequest request = new JobNeedPreferenceRequest();
         request.setMinSalary(BigDecimal.valueOf(50000000));
         request.setMaxSalary(BigDecimal.valueOf(10000000));
 
         when(authContextService.requireCurrentUser()).thenReturn(candidate);
-        when(jobNeedPreferenceRepository.findById(3L)).thenReturn(Optional.of(preference));
+        when(savedSearchRepository.findFirstByUserIdAndNameOrderByUpdatedAtDesc(3L, "Nhu cau viec lam")).thenReturn(Optional.of(search));
 
         assertThrows(ResponseStatusException.class,
                 () -> jobNeedPreferenceService.updateMyPreferences(request));
@@ -88,15 +96,20 @@ class JobNeedPreferenceServiceTest {
 
     @Test
     void getMyPreferences_shouldAllowRecruiterAndAdmin() {
-        when(authContextService.requireCurrentUser()).thenReturn(user(4L, User.Role.RECRUITER));
-        when(jobNeedPreferenceRepository.findById(4L)).thenReturn(Optional.empty());
-        when(jobNeedPreferenceRepository.save(any(JobNeedPreference.class)))
+        User recruiter = user(4L, User.Role.RECRUITER);
+        User admin = user(5L, User.Role.ADMIN);
+
+        when(authContextService.requireCurrentUser()).thenReturn(recruiter);
+        when(savedSearchRepository.findFirstByUserIdAndNameOrderByUpdatedAtDesc(4L, "Nhu cau viec lam")).thenReturn(Optional.empty());
+        when(userRepository.findById(4L)).thenReturn(Optional.of(recruiter));
+        when(savedSearchRepository.save(any(SavedSearch.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         assertEquals(false, jobNeedPreferenceService.getMyPreferences().getRemoteOnly());
 
-        when(authContextService.requireCurrentUser()).thenReturn(user(5L, User.Role.ADMIN));
-        when(jobNeedPreferenceRepository.findById(5L)).thenReturn(Optional.empty());
+        when(authContextService.requireCurrentUser()).thenReturn(admin);
+        when(savedSearchRepository.findFirstByUserIdAndNameOrderByUpdatedAtDesc(5L, "Nhu cau viec lam")).thenReturn(Optional.empty());
+        when(userRepository.findById(5L)).thenReturn(Optional.of(admin));
 
         assertEquals(false, jobNeedPreferenceService.getMyPreferences().getRemoteOnly());
     }
@@ -109,3 +122,4 @@ class JobNeedPreferenceServiceTest {
         return user;
     }
 }
+

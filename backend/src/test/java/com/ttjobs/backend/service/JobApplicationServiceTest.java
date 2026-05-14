@@ -1,6 +1,6 @@
 package com.ttjobs.backend.service;
 
-import com.ttjobs.backend.dto.JobApplicationDTO;
+import com.ttjobs.backend.dto.application.JobApplicationDTO;
 import com.ttjobs.backend.entity.Company;
 import com.ttjobs.backend.entity.Job;
 import com.ttjobs.backend.entity.JobApplication;
@@ -341,3 +341,4 @@ class JobApplicationServiceTest {
         return user;
     }
 }
+

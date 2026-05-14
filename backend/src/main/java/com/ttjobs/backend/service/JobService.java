@@ -1,7 +1,7 @@
 package com.ttjobs.backend.service;
 
-import com.ttjobs.backend.dto.JobCategoryStatDTO;
-import com.ttjobs.backend.dto.JobDTO;
+import com.ttjobs.backend.dto.job.JobCategoryStatDTO;
+import com.ttjobs.backend.dto.job.JobDTO;
 import com.ttjobs.backend.entity.Company;
 import com.ttjobs.backend.entity.Job;
 import com.ttjobs.backend.entity.User;
@@ -53,6 +53,8 @@ public class JobService {
     private ImageUploadService imageUploadService;
     @Autowired
     private CompanyFollowService companyFollowService;
+    @Autowired
+    private CompanyVerificationStatusService companyVerificationStatusService;
 
     public List<JobDTO> getAllJobs() {
         // Default candidate-facing list only shows open jobs.
@@ -121,7 +123,10 @@ public class JobService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
 
         User currentUser = authContextService.getCurrentUserOptional().orElse(null);
-        if (!OPEN.equals(job.getStatus())) {
+        boolean publicVisible = OPEN.equals(job.getStatus())
+                && job.getCompany() != null
+                && companyVerificationStatusService.isVerified(job.getCompany());
+        if (!publicVisible) {
             if (currentUser == null || !canManageJob(currentUser, job)) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You cannot access this job");
             }
@@ -146,6 +151,9 @@ public class JobService {
         job.setCompany(company);
         job.setPostedDate(LocalDateTime.now());
         job.setStatus(normalizeJobStatus(job.getStatus(), DRAFT));
+        if (OPEN.equals(job.getStatus()) && !companyVerificationStatusService.isVerified(company)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Company must be verified before publishing jobs");
+        }
         normalizeCompensation(job);
         Job saved = jobRepository.save(job);
         recruiterActivityLogService.logJobCreated(currentUser, saved);
@@ -216,6 +224,11 @@ public class JobService {
 
         if (jobDetails.getStatus() != null && !jobDetails.getStatus().isBlank()) {
             String nextStatus = normalizeJobStatus(jobDetails.getStatus(), null);
+            if (OPEN.equals(nextStatus)
+                    && job.getCompany() != null
+                    && !companyVerificationStatusService.isVerified(job.getCompany())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Company must be verified before publishing jobs");
+            }
             validateJobTransition(job.getStatus(), nextStatus);
             job.setStatus(nextStatus);
             changed = true;
@@ -296,6 +309,9 @@ public class JobService {
         Pageable pageable = PageRequest.of(safePage, safeSize, resolveSort(sort));
 
         Specification<Job> spec = Specification.where(JobSpecifications.activeJobs());
+        if (OPEN.equals(normalizedStatus)) {
+            spec = spec.and(JobSpecifications.companyVerified());
+        }
         if (keyword != null && !keyword.isBlank()) {
             spec = spec.and(JobSpecifications.keywordLike(keyword));
         }
@@ -509,3 +525,4 @@ public class JobService {
         };
     }
 }
+

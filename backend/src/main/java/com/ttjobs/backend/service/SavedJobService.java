@@ -1,6 +1,6 @@
 package com.ttjobs.backend.service;
 
-import com.ttjobs.backend.dto.SavedJobDTO;
+import com.ttjobs.backend.dto.job.SavedJobDTO;
 import com.ttjobs.backend.entity.Job;
 import com.ttjobs.backend.entity.SavedJob;
 import com.ttjobs.backend.entity.User;
@@ -25,6 +25,8 @@ public class SavedJobService {
 
     @Autowired
     private AuthContextService authContextService;
+    @Autowired(required = false)
+    private AiMonitoringService aiMonitoringService;
 
     public SavedJobDTO saveJob(Long jobId) {
         User currentUser = authContextService.requireCurrentUser();
@@ -43,7 +45,9 @@ public class SavedJobService {
         savedJob.setUser(currentUser);
         savedJob.setJob(job);
 
-        return toDto(savedJobRepository.save(savedJob));
+        SavedJob saved = savedJobRepository.save(savedJob);
+        recordAiEvent(currentUser, job, "job_saved");
+        return toDto(saved);
     }
 
     public void unsaveJob(Long jobId) {
@@ -95,4 +99,20 @@ public class SavedJobService {
         }
         return dto;
     }
+
+    private void recordAiEvent(User user, Job job, String eventType) {
+        if (aiMonitoringService != null) {
+            aiMonitoringService.recordMatchEvent(
+                    user.getId(),
+                    job,
+                    eventType,
+                    user.getCvText(),
+                    job == null ? null : job.getDescription(),
+                    null,
+                    null,
+                    "user-action"
+            );
+        }
+    }
 }
+

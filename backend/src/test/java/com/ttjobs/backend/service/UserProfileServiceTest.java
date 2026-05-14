@@ -1,7 +1,7 @@
 package com.ttjobs.backend.service;
 
-import com.ttjobs.backend.dto.UpdateMyProfileRequest;
-import com.ttjobs.backend.dto.UserProfileDTO;
+import com.ttjobs.backend.dto.user.UpdateMyProfileRequest;
+import com.ttjobs.backend.dto.user.UserProfileDTO;
 import com.ttjobs.backend.entity.Skill;
 import com.ttjobs.backend.entity.User;
 import com.ttjobs.backend.repository.SkillRepository;
@@ -75,3 +75,4 @@ class UserProfileServiceTest {
         return user;
     }
 }
+

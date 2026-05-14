@@ -1,6 +1,6 @@
 package com.ttjobs.backend.service;
 
-import com.ttjobs.backend.dto.SavedJobDTO;
+import com.ttjobs.backend.dto.job.SavedJobDTO;
 import com.ttjobs.backend.entity.Company;
 import com.ttjobs.backend.entity.Job;
 import com.ttjobs.backend.entity.SavedJob;
@@ -134,3 +134,4 @@ class SavedJobServiceTest {
         return job;
     }
 }
+

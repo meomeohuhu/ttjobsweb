@@ -1,18 +1,18 @@
 package com.ttjobs.backend.service;
 
-import com.ttjobs.backend.dto.ApplicationTimelineDTO;
-import com.ttjobs.backend.dto.AiCvScoreDTO;
-import com.ttjobs.backend.dto.AiCvScoreRequest;
-import com.ttjobs.backend.dto.CandidateSearchDTO;
-import com.ttjobs.backend.dto.InterviewScheduleDTO;
-import com.ttjobs.backend.dto.InterviewScheduleRequest;
-import com.ttjobs.backend.dto.RecruiterApplicationDTO;
-import com.ttjobs.backend.dto.RecruiterApplicationDetailDTO;
-import com.ttjobs.backend.dto.RecruiterCompanyDTO;
-import com.ttjobs.backend.dto.RecruiterJobDTO;
-import com.ttjobs.backend.dto.RecruiterReportDTO;
-import com.ttjobs.backend.dto.RecruitmentCampaignDTO;
-import com.ttjobs.backend.dto.RecruitmentCampaignRequest;
+import com.ttjobs.backend.dto.application.ApplicationTimelineDTO;
+import com.ttjobs.backend.dto.ai.AiCvScoreDTO;
+import com.ttjobs.backend.dto.ai.AiCvScoreRequest;
+import com.ttjobs.backend.dto.recruiter.CandidateSearchDTO;
+import com.ttjobs.backend.dto.interview.InterviewScheduleDTO;
+import com.ttjobs.backend.dto.interview.InterviewScheduleRequest;
+import com.ttjobs.backend.dto.recruiter.RecruiterApplicationDTO;
+import com.ttjobs.backend.dto.recruiter.RecruiterApplicationDetailDTO;
+import com.ttjobs.backend.dto.recruiter.RecruiterCompanyDTO;
+import com.ttjobs.backend.dto.recruiter.RecruiterJobDTO;
+import com.ttjobs.backend.dto.recruiter.RecruiterReportDTO;
+import com.ttjobs.backend.dto.recruiter.RecruitmentCampaignDTO;
+import com.ttjobs.backend.dto.recruiter.RecruitmentCampaignRequest;
 import com.ttjobs.backend.entity.Company;
 import com.ttjobs.backend.entity.CompanyMember;
 import com.ttjobs.backend.entity.ApplicationAiScore;
@@ -68,6 +68,8 @@ public class RecruiterWorkspaceService {
     private CompanyAuthorizationService companyAuthorizationService;
     @Autowired
     private CompanyRepository companyRepository;
+    @Autowired
+    private CompanyVerificationStatusService companyVerificationStatusService;
     @Autowired
     private CompanyMemberRepository companyMemberRepository;
     @Autowired
@@ -420,6 +422,7 @@ public class RecruiterWorkspaceService {
         dto.setWebsite(company.getWebsite());
         dto.setIndustry(company.getIndustry());
         dto.setLogoUrl(company.getLogoUrl());
+        dto.setVerificationStatus(companyVerificationStatusService.getEffectiveStatus(company).name());
         dto.setMemberRole(resolveMemberRole(company, currentUser));
         dto.setJobCount((long) jobs.size());
         dto.setOpenJobCount(jobs.stream().filter(job -> "open".equalsIgnoreCase(job.getStatus())).count());
@@ -816,3 +819,4 @@ public class RecruiterWorkspaceService {
         return items.subList(from, to);
     }
 }
+

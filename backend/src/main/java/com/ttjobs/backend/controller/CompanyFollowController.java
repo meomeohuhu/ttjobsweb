@@ -1,7 +1,7 @@
 package com.ttjobs.backend.controller;
 
-import com.ttjobs.backend.dto.CompanyDTO;
-import com.ttjobs.backend.dto.CompanyFollowStatusDTO;
+import com.ttjobs.backend.dto.company.CompanyDTO;
+import com.ttjobs.backend.dto.company.CompanyFollowStatusDTO;
 import com.ttjobs.backend.service.CompanyFollowService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -40,3 +40,4 @@ public class CompanyFollowController {
         return companyFollowService.unfollowCompany(companyId);
     }
 }
+

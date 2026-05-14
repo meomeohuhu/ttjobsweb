@@ -1,8 +1,8 @@
 package com.ttjobs.backend.controller;
 
-import com.ttjobs.backend.dto.CompanyReviewDTO;
-import com.ttjobs.backend.dto.CompanyReviewRequest;
-import com.ttjobs.backend.dto.CompanyReviewSummaryDTO;
+import com.ttjobs.backend.dto.company.CompanyReviewDTO;
+import com.ttjobs.backend.dto.company.CompanyReviewRequest;
+import com.ttjobs.backend.dto.company.CompanyReviewSummaryDTO;
 import com.ttjobs.backend.service.CompanyReviewService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,3 +29,4 @@ public class CompanyReviewController {
         return companyReviewService.createReview(companyId, request);
     }
 }
+

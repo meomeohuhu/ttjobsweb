@@ -7,7 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.ttjobs.backend.dto.JobDTO;
+import com.ttjobs.backend.dto.job.JobDTO;
 import com.ttjobs.backend.service.JwtService;
 import com.ttjobs.backend.service.RecommendationService;
 import java.util.List;
@@ -65,4 +65,14 @@ class RecommendationControllerTest {
 
         verify(recommendationService).recommendByJobNeeds();
     }
+
+    @Test
+    void recordRecommendationEvent_shouldForwardEventToService() throws Exception {
+        mockMvc.perform(post("/api/recommendations/jobs/10/event")
+                        .param("eventType", "recommendation_clicked"))
+                .andExpect(status().isOk());
+
+        verify(recommendationService).recordRecommendationInteraction(10L, "recommendation_clicked");
+    }
 }
+

@@ -1,10 +1,10 @@
 package com.ttjobs.backend.service;
 
-import com.ttjobs.backend.dto.JobApplicationDTO;
-import com.ttjobs.backend.dto.RecruiterActivityLogDTO;
-import com.ttjobs.backend.dto.RecruiterDashboardCompanyDTO;
-import com.ttjobs.backend.dto.RecruiterDashboardDTO;
-import com.ttjobs.backend.dto.RecruiterDashboardJobDTO;
+import com.ttjobs.backend.dto.application.JobApplicationDTO;
+import com.ttjobs.backend.dto.recruiter.RecruiterActivityLogDTO;
+import com.ttjobs.backend.dto.recruiter.RecruiterDashboardCompanyDTO;
+import com.ttjobs.backend.dto.recruiter.RecruiterDashboardDTO;
+import com.ttjobs.backend.dto.recruiter.RecruiterDashboardJobDTO;
 import com.ttjobs.backend.entity.Company;
 import com.ttjobs.backend.entity.CompanyMember;
 import com.ttjobs.backend.entity.Job;
@@ -241,3 +241,4 @@ public class RecruiterDashboardService {
         return dto;
     }
 }
+

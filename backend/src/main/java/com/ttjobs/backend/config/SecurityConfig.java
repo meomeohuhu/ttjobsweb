@@ -1,26 +1,51 @@
 package com.ttjobs.backend.config;
 
 import com.ttjobs.backend.security.JwtFilter;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.servlet.http.HttpServletResponse;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.http.HttpMethod;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
-
 @Configuration
 public class SecurityConfig {
 
-    @Autowired
-    private JwtFilter jwtFilter;
+    private static final List<String> FRONTEND_DEV_ORIGINS = List.of(
+            "http://localhost:5173",
+            "http://localhost:5174",
+            "http://localhost:5175",
+            "http://localhost:5176",
+            "http://localhost:5190",
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:5174",
+            "http://127.0.0.1:5175",
+            "http://127.0.0.1:5176",
+            "http://127.0.0.1:5190"
+    );
+
+    private static final List<String> ALLOWED_METHODS = List.of(
+            "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"
+    );
+
+    private final JwtFilter jwtFilter;
+    private final String configuredAllowedOrigins;
+
+    public SecurityConfig(
+            JwtFilter jwtFilter,
+            @Value("${ttjobs.cors.allowed-origins:}") String configuredAllowedOrigins) {
+        this.jwtFilter = jwtFilter;
+        this.configuredAllowedOrigins = configuredAllowedOrigins;
+    }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -33,11 +58,14 @@ public class SecurityConfig {
             // Enable CORS for frontend dev server.
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 // Public endpoints: registration and login.
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/ws/**").permitAll()
-                // Swagger UI and static OpenAPI spec.
-                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/openapi.yaml", "/actuator/health").permitAll()
+                // Docker healthcheck is internal; Nginx blocks public actuator access.
+                .requestMatchers("/actuator/health").permitAll()
+                // Swagger UI, static OpenAPI spec, and other actuator endpoints are admin-only.
+                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/openapi.yaml", "/actuator/**").hasRole("ADMIN")
                 // Public job listings and job detail.
                 .requestMatchers(HttpMethod.GET, "/api/jobs/**").permitAll()
                 // Public company pages.
@@ -50,11 +78,13 @@ public class SecurityConfig {
                         "/api/companies/*/follow-status").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/career-guides/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/skills").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/forum/posts", "/api/forum/posts/**").permitAll()
+                .requestMatchers("/api/forum/**").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/tools/salary-benchmark").permitAll()
                 .requestMatchers("/api/tools/sessions/**").authenticated()
                 // Authenticated company follow actions.
                 .requestMatchers("/api/company-follows/**").authenticated()
-                .requestMatchers("/api/job-needs/**").authenticated()
+                .requestMatchers("/api/job-needs/**", "/api/saved-searches/**", "/api/ai/**", "/api/interviews/**").authenticated()
                 // Recruiter dashboard and future recruiter workspace routes.
                 .requestMatchers("/api/recruiter/**").authenticated()
                 // Only users with ROLE_ADMIN can access admin routes.
@@ -77,25 +107,24 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        // Allow Vite dev servers. Vite can auto-increment ports when 5173 is busy.
-        config.setAllowedOriginPatterns(List.of(
-                "http://localhost:5173",
-                "http://localhost:5174",
-                "http://localhost:5175",
-                "http://localhost:5176",
-                "http://localhost:5190",
-                "http://127.0.0.1:5173",
-                "http://127.0.0.1:5174",
-                "http://127.0.0.1:5175",
-                "http://127.0.0.1:5176",
-                "http://127.0.0.1:5190"
-        ));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        config.setAllowedOriginPatterns(allowedOriginPatterns());
+        config.setAllowedMethods(ALLOWED_METHODS);
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;
+    }
+
+    private List<String> allowedOriginPatterns() {
+        List<String> origins = new ArrayList<>(FRONTEND_DEV_ORIGINS);
+        if (configuredAllowedOrigins != null && !configuredAllowedOrigins.isBlank()) {
+            origins.addAll(Arrays.stream(configuredAllowedOrigins.split(","))
+                    .map(String::trim)
+                    .filter(origin -> !origin.isEmpty())
+                    .toList());
+        }
+        return origins;
     }
 }

@@ -1,11 +1,11 @@
 package com.ttjobs.backend.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ttjobs.backend.dto.CompanyDTO;
-import com.ttjobs.backend.dto.CompanyMemberDTO;
-import com.ttjobs.backend.dto.CompanyMemberUpsertRequest;
-import com.ttjobs.backend.dto.CompanyPublicPageDTO;
-import com.ttjobs.backend.dto.JobDTO;
+import com.ttjobs.backend.dto.company.CompanyDTO;
+import com.ttjobs.backend.dto.company.CompanyMemberDTO;
+import com.ttjobs.backend.dto.company.CompanyMemberUpsertRequest;
+import com.ttjobs.backend.dto.company.CompanyPublicPageDTO;
+import com.ttjobs.backend.dto.job.JobDTO;
 import com.ttjobs.backend.service.CompanyService;
 import com.ttjobs.backend.service.JwtService;
 import org.junit.jupiter.api.Test;
@@ -179,3 +179,4 @@ class CompanyControllerApiTest {
                 .andExpect(status().isBadRequest());
     }
 }
+

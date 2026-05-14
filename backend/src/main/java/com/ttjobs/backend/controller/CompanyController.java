@@ -6,12 +6,15 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import com.ttjobs.backend.entity.Company;
-import com.ttjobs.backend.dto.CompanyDTO;
-import com.ttjobs.backend.dto.CompanyMemberDTO;
-import com.ttjobs.backend.dto.CompanyMemberUpsertRequest;
-import com.ttjobs.backend.dto.CompanyPublicPageDTO;
-import com.ttjobs.backend.dto.JobDTO;
+import com.ttjobs.backend.dto.company.CompanyDTO;
+import com.ttjobs.backend.dto.company.CompanyMemberDTO;
+import com.ttjobs.backend.dto.company.CompanyMemberUpsertRequest;
+import com.ttjobs.backend.dto.company.CompanyPublicPageDTO;
+import com.ttjobs.backend.dto.company.CompanyVerificationDTO;
+import com.ttjobs.backend.dto.company.CompanyVerificationRequest;
+import com.ttjobs.backend.dto.job.JobDTO;
 import com.ttjobs.backend.service.CompanyService;
+import com.ttjobs.backend.service.CompanyVerificationService;
 import java.util.List;
 
 @RestController
@@ -20,6 +23,8 @@ public class CompanyController {
 
     @Autowired
     private CompanyService companyService;
+    @Autowired(required = false)
+    private CompanyVerificationService companyVerificationService;
 
     @GetMapping
     public List<CompanyDTO> getAllCompanies() {
@@ -89,4 +94,16 @@ public class CompanyController {
     public void removeCompanyMember(@PathVariable Long companyId, @PathVariable Long memberId) {
         companyService.removeCompanyMember(companyId, memberId);
     }
+
+    @GetMapping("/{companyId}/verification")
+    public CompanyVerificationDTO getVerification(@PathVariable Long companyId) {
+        return companyVerificationService.getMyVerification(companyId);
+    }
+
+    @PutMapping("/{companyId}/verification")
+    public CompanyVerificationDTO updateVerification(@PathVariable Long companyId,
+                                                     @RequestBody CompanyVerificationRequest request) {
+        return companyVerificationService.upsertVerification(companyId, request);
+    }
 }
+

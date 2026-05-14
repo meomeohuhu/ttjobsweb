@@ -1,7 +1,7 @@
 package com.ttjobs.backend.controller;
 
-import com.ttjobs.backend.dto.JobNeedPreferenceDTO;
-import com.ttjobs.backend.dto.JobNeedPreferenceRequest;
+import com.ttjobs.backend.dto.job.JobNeedPreferenceDTO;
+import com.ttjobs.backend.dto.job.JobNeedPreferenceRequest;
 import com.ttjobs.backend.service.JobNeedPreferenceService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,3 +28,4 @@ public class JobNeedPreferenceController {
         return jobNeedPreferenceService.updateMyPreferences(request);
     }
 }
+

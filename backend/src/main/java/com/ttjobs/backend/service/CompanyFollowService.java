@@ -1,7 +1,7 @@
 package com.ttjobs.backend.service;
 
-import com.ttjobs.backend.dto.CompanyFollowStatusDTO;
-import com.ttjobs.backend.dto.CompanyDTO;
+import com.ttjobs.backend.dto.company.CompanyFollowStatusDTO;
+import com.ttjobs.backend.dto.company.CompanyDTO;
 import com.ttjobs.backend.entity.Company;
 import com.ttjobs.backend.entity.CompanyFollow;
 import com.ttjobs.backend.entity.Job;
@@ -123,3 +123,4 @@ public class CompanyFollowService {
         return dto;
     }
 }
+

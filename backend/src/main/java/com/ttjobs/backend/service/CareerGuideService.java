@@ -1,7 +1,7 @@
 package com.ttjobs.backend.service;
 
-import com.ttjobs.backend.dto.CareerGuideArticleDTO;
-import com.ttjobs.backend.dto.CareerGuideRequest;
+import com.ttjobs.backend.dto.career.CareerGuideArticleDTO;
+import com.ttjobs.backend.dto.career.CareerGuideRequest;
 import com.ttjobs.backend.entity.CareerGuideArticle;
 import com.ttjobs.backend.repository.CareerGuideArticleRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -104,3 +104,4 @@ public class CareerGuideService {
         return dto;
     }
 }
+

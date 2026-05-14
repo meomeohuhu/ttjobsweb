@@ -1,13 +1,13 @@
 package com.ttjobs.backend.service;
 
-import com.ttjobs.backend.dto.UpdateMyProfileRequest;
-import com.ttjobs.backend.dto.ChangePasswordRequest;
-import com.ttjobs.backend.dto.EmailChangeConfirmRequest;
-import com.ttjobs.backend.dto.EmailChangeRequest;
-import com.ttjobs.backend.dto.EmailChangeResponse;
-import com.ttjobs.backend.dto.PersonalityProfileDTO;
-import com.ttjobs.backend.dto.SavePersonalityRequest;
-import com.ttjobs.backend.dto.UserProfileDTO;
+import com.ttjobs.backend.dto.user.UpdateMyProfileRequest;
+import com.ttjobs.backend.dto.auth.ChangePasswordRequest;
+import com.ttjobs.backend.dto.auth.EmailChangeConfirmRequest;
+import com.ttjobs.backend.dto.auth.EmailChangeRequest;
+import com.ttjobs.backend.dto.auth.EmailChangeResponse;
+import com.ttjobs.backend.dto.user.PersonalityProfileDTO;
+import com.ttjobs.backend.dto.user.SavePersonalityRequest;
+import com.ttjobs.backend.dto.user.UserProfileDTO;
 import com.ttjobs.backend.entity.EmailChangeVerification;
 import com.ttjobs.backend.entity.Skill;
 import com.ttjobs.backend.entity.User;
@@ -291,3 +291,4 @@ public class UserProfileService {
         return dto;
     }
 }
+

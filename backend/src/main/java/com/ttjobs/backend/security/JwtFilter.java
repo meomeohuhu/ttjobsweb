@@ -1,11 +1,14 @@
 package com.ttjobs.backend.security;
 
+import com.ttjobs.backend.entity.User;
+import com.ttjobs.backend.repository.UserRepository;
 import com.ttjobs.backend.service.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -21,6 +24,8 @@ public class JwtFilter extends OncePerRequestFilter {
 
     @Autowired
     private JwtService jwtService;
+    @Autowired
+    private ObjectProvider<UserRepository> userRepositoryProvider;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -42,13 +47,22 @@ public class JwtFilter extends OncePerRequestFilter {
         try {
             String email = jwtService.extractEmail(token);
             String role = jwtService.extractRole(token);
+            UserRepository userRepository = userRepositoryProvider.getIfAvailable();
+            String currentRole = userRepository == null
+                    ? role
+                    : userRepository.findByEmail(email)
+                            .map(User::getRole)
+                            .map(Enum::name)
+                            .orElse(role);
 
-            if (role == null || role.isBlank()) {
+            if (currentRole == null || currentRole.isBlank()) {
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 return;
             }
 
-            String authority = "ROLE_" + role.toUpperCase(Locale.ROOT);
+            // Luon uu tien role moi nhat trong DB de admin doi quyen co hieu luc ngay,
+            // tranh token cu van giu role cu va gay 403 sau khi nang quyen.
+            String authority = "ROLE_" + currentRole.toUpperCase(Locale.ROOT);
             UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                 email,
                 null,

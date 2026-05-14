@@ -1,6 +1,6 @@
 package com.ttjobs.backend.service;
 
-import com.ttjobs.backend.dto.RecruiterActivityLogDTO;
+import com.ttjobs.backend.dto.recruiter.RecruiterActivityLogDTO;
 import com.ttjobs.backend.entity.Company;
 import com.ttjobs.backend.entity.Job;
 import com.ttjobs.backend.entity.JobApplication;
@@ -228,3 +228,4 @@ public class RecruiterActivityLogService {
         return value == null || value.isBlank() ? "Đang cập nhật" : value;
     }
 }
+

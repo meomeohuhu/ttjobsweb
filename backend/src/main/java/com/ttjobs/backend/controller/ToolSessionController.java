@@ -1,7 +1,7 @@
 package com.ttjobs.backend.controller;
 
-import com.ttjobs.backend.dto.ToolSessionRequest;
-import com.ttjobs.backend.dto.ToolSessionResponse;
+import com.ttjobs.backend.dto.tool.ToolSessionRequest;
+import com.ttjobs.backend.dto.tool.ToolSessionResponse;
 import com.ttjobs.backend.service.ToolSessionService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,3 +41,4 @@ public class ToolSessionController {
         toolSessionService.deleteMySession(id);
     }
 }
+

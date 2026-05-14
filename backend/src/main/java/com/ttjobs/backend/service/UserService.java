@@ -6,9 +6,10 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import com.ttjobs.backend.dto.RegisterRequest;
+import com.ttjobs.backend.dto.auth.RegisterRequest;
 import com.ttjobs.backend.entity.User;
 import com.ttjobs.backend.repository.UserRepository;
+import java.util.Locale;
 
 @Service
 public class UserService {
@@ -22,14 +23,15 @@ public class UserService {
     @Autowired
     private RecruiterActivityLogService recruiterActivityLogService;
 
-    public User register(RegisterRequest request) {
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            throw new RuntimeException("Email already exists");
+    public void register(RegisterRequest request) {
+        String email = normalizeEmail(request.getEmail());
+        if (userRepository.findByEmail(email).isPresent()) {
+            return;
         }
 
         User user = new User();
-        user.setName(request.getName());
-        user.setEmail(request.getEmail());
+        user.setName(request.getName().trim());
+        user.setEmail(email);
 
         BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
@@ -37,20 +39,25 @@ public class UserService {
         // Default role for new accounts if not provided.
         user.setRole(User.Role.CANDIDATE);
 
-        return userRepository.save(user);
+        userRepository.save(user);
     }
 
     public String login(String email, String password) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        User user = userRepository.findByEmail(normalizeEmail(email))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password"));
 
         BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
         if (!encoder.matches(password, user.getPasswordHash())) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password");
         }
 
         recruiterActivityLogService.logLoginSuccess(user);
         return jwtService.generateToken(user.getEmail(), user.getRole().name());
     }
+
+    private String normalizeEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
+    }
 }
+

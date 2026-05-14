@@ -1,10 +1,12 @@
 package com.ttjobs.backend.service;
 
-import com.ttjobs.backend.dto.JobNeedPreferenceDTO;
-import com.ttjobs.backend.dto.JobNeedPreferenceRequest;
+import com.ttjobs.backend.dto.job.JobNeedPreferenceDTO;
+import com.ttjobs.backend.dto.job.JobNeedPreferenceRequest;
 import com.ttjobs.backend.entity.JobNeedPreference;
+import com.ttjobs.backend.entity.SavedSearch;
 import com.ttjobs.backend.entity.User;
-import com.ttjobs.backend.repository.JobNeedPreferenceRepository;
+import com.ttjobs.backend.repository.SavedSearchRepository;
+import com.ttjobs.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -18,8 +20,12 @@ import java.util.stream.Collectors;
 @Service
 public class JobNeedPreferenceService {
 
+    private static final String DEFAULT_NEED_SEARCH_NAME = "Nhu cau viec lam";
+
     @Autowired
-    private JobNeedPreferenceRepository jobNeedPreferenceRepository;
+    private SavedSearchRepository savedSearchRepository;
+    @Autowired
+    private UserRepository userRepository;
     @Autowired
     private AuthContextService authContextService;
 
@@ -64,12 +70,13 @@ public class JobNeedPreferenceService {
         }
 
         validateSalaryRange(preference);
-        return toDto(jobNeedPreferenceRepository.save(preference));
+        SavedSearch search = getOrCreateDefaultSearch(currentUser.getId());
+        applyPreference(search, preference);
+        return toDto(toPreference(savedSearchRepository.save(search)));
     }
 
     public JobNeedPreference getOrCreate(Long userId) {
-        return jobNeedPreferenceRepository.findById(userId)
-                .orElseGet(() -> createDefault(userId));
+        return toPreference(getOrCreateDefaultSearch(userId));
     }
 
     public boolean hasConfiguredCriteria(JobNeedPreference preference) {
@@ -87,13 +94,23 @@ public class JobNeedPreferenceService {
         );
     }
 
-    private JobNeedPreference createDefault(Long userId) {
-        JobNeedPreference preference = new JobNeedPreference();
-        preference.setUserId(userId);
-        preference.setRemoteOnly(false);
-        preference.setCreatedAt(LocalDateTime.now());
-        preference.setUpdatedAt(LocalDateTime.now());
-        return jobNeedPreferenceRepository.save(preference);
+    private SavedSearch getOrCreateDefaultSearch(Long userId) {
+        return savedSearchRepository.findFirstByUserIdAndNameOrderByUpdatedAtDesc(userId, DEFAULT_NEED_SEARCH_NAME)
+                .orElseGet(() -> createDefaultSearch(userId));
+    }
+
+    private SavedSearch createDefaultSearch(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        SavedSearch search = new SavedSearch();
+        search.setUser(user);
+        search.setName(DEFAULT_NEED_SEARCH_NAME);
+        search.setRemoteOnly(false);
+        search.setActive(true);
+        search.setAlertFrequency("DAILY");
+        search.setCreatedAt(LocalDateTime.now());
+        search.setUpdatedAt(LocalDateTime.now());
+        return savedSearchRepository.save(search);
     }
 
     private void validateSalaryRange(JobNeedPreference preference) {
@@ -133,6 +150,41 @@ public class JobNeedPreferenceService {
                 .toList();
     }
 
+    private void applyPreference(SavedSearch search, JobNeedPreference preference) {
+        search.setKeyword(preference.getDesiredTitle());
+        search.setLocation(preference.getDesiredLocation());
+        search.setCategory(preference.getDesiredCategory());
+        search.setJobType(preference.getDesiredJobType());
+        search.setExperienceLevel(preference.getDesiredExperienceLevel());
+        search.setSalaryMin(preference.getMinSalary());
+        search.setSalaryMax(preference.getMaxSalary());
+        search.setSkills(preference.getPreferredSkills());
+        search.setExcludedKeywords(preference.getExcludedKeywords());
+        search.setRemoteOnly(Boolean.TRUE.equals(preference.getRemoteOnly()));
+        search.setActive(true);
+        if (!hasText(search.getAlertFrequency())) {
+            search.setAlertFrequency("DAILY");
+        }
+    }
+
+    private JobNeedPreference toPreference(SavedSearch search) {
+        JobNeedPreference preference = new JobNeedPreference();
+        preference.setUserId(search.getUser() == null ? null : search.getUser().getId());
+        preference.setDesiredTitle(search.getKeyword());
+        preference.setDesiredLocation(search.getLocation());
+        preference.setDesiredCategory(search.getCategory());
+        preference.setDesiredJobType(search.getJobType());
+        preference.setDesiredExperienceLevel(search.getExperienceLevel());
+        preference.setMinSalary(search.getSalaryMin());
+        preference.setMaxSalary(search.getSalaryMax());
+        preference.setPreferredSkills(search.getSkills());
+        preference.setExcludedKeywords(search.getExcludedKeywords());
+        preference.setRemoteOnly(Boolean.TRUE.equals(search.getRemoteOnly()));
+        preference.setCreatedAt(search.getCreatedAt());
+        preference.setUpdatedAt(search.getUpdatedAt());
+        return preference;
+    }
+
     private JobNeedPreferenceDTO toDto(JobNeedPreference preference) {
         JobNeedPreferenceDTO dto = new JobNeedPreferenceDTO();
         dto.setDesiredTitle(preference.getDesiredTitle());
@@ -150,3 +202,4 @@ public class JobNeedPreferenceService {
         return dto;
     }
 }
+

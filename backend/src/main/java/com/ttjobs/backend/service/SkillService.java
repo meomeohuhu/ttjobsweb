@@ -1,7 +1,7 @@
 package com.ttjobs.backend.service;
 
-import com.ttjobs.backend.dto.CreateSkillRequest;
-import com.ttjobs.backend.dto.SkillDTO;
+import com.ttjobs.backend.dto.skill.CreateSkillRequest;
+import com.ttjobs.backend.dto.skill.SkillDTO;
 import com.ttjobs.backend.entity.Skill;
 import com.ttjobs.backend.repository.SkillRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -66,3 +66,4 @@ public class SkillService {
         return builder.toString();
     }
 }
+

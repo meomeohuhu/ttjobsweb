@@ -5,7 +5,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
-import com.ttjobs.backend.dto.JobApplicationDTO;
+import com.ttjobs.backend.dto.application.ApplicationTimelineDTO;
+import com.ttjobs.backend.dto.application.JobApplicationDTO;
 import com.ttjobs.backend.service.JobApplicationService;
 import org.springframework.http.MediaType;
 import org.springframework.validation.annotation.Validated;
@@ -76,7 +77,7 @@ public class JobApplicationController {
     }
 
     @GetMapping("/{applicationId}/timeline")
-    public List<com.ttjobs.backend.dto.ApplicationTimelineDTO> getTimeline(@PathVariable Long applicationId) {
+    public List<ApplicationTimelineDTO> getTimeline(@PathVariable Long applicationId) {
         return jobApplicationService.getApplicationTimeline(applicationId);
     }
 
@@ -85,3 +86,4 @@ public class JobApplicationController {
         jobApplicationService.streamCv(applicationId, response);
     }
 }
+

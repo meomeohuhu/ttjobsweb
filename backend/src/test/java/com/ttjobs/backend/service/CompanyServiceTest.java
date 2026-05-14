@@ -1,7 +1,7 @@
 package com.ttjobs.backend.service;
 
-import com.ttjobs.backend.dto.CompanyMemberUpsertRequest;
-import com.ttjobs.backend.dto.CompanyPublicPageDTO;
+import com.ttjobs.backend.dto.company.CompanyMemberUpsertRequest;
+import com.ttjobs.backend.dto.company.CompanyPublicPageDTO;
 import com.ttjobs.backend.entity.Company;
 import com.ttjobs.backend.entity.CompanyMember;
 import com.ttjobs.backend.entity.Job;
@@ -12,6 +12,7 @@ import com.ttjobs.backend.repository.CompanyRepository;
 import com.ttjobs.backend.repository.JobRepository;
 import com.ttjobs.backend.repository.UserRepository;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -25,8 +26,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -46,9 +49,27 @@ class CompanyServiceTest {
     private JobRepository jobRepository;
     @Mock
     private CompanyFollowRepository companyFollowRepository;
+    @Mock
+    private CompanyVerificationStatusService companyVerificationStatusService;
 
     @InjectMocks
     private CompanyService companyService;
+
+    @BeforeEach
+    void setUpVerificationStatusFallback() {
+        lenient().when(companyVerificationStatusService.getEffectiveStatus(any(Company.class)))
+                .thenAnswer(invocation -> {
+                    Company company = invocation.getArgument(0);
+                    return company.getVerificationStatus() == null
+                            ? Company.VerificationStatus.PENDING
+                            : company.getVerificationStatus();
+                });
+        lenient().when(companyVerificationStatusService.isVerified(any(Company.class)))
+                .thenAnswer(invocation -> {
+                    Company company = invocation.getArgument(0);
+                    return company.getVerificationStatus() == Company.VerificationStatus.VERIFIED;
+                });
+    }
 
     @Test
     void addCompanyMember_shouldReturnCreatedMember_whenValid() {
@@ -283,3 +304,4 @@ class CompanyServiceTest {
         return company;
     }
 }
+

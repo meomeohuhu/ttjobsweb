@@ -35,6 +35,13 @@ public final class JobSpecifications {
         };
     }
 
+    public static Specification<Job> companyVerified() {
+        return (root, query, cb) -> {
+            Join<Job, Company> company = root.join("company", JoinType.INNER);
+            return cb.equal(company.get("verificationStatus"), Company.VerificationStatus.VERIFIED);
+        };
+    }
+
     public static Specification<Job> keywordLike(String keyword) {
         return (root, query, cb) -> {
             List<String> tokens = tokenize(keyword);

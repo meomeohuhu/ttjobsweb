@@ -1,7 +1,7 @@
 package com.ttjobs.backend.service;
 
-import com.ttjobs.backend.dto.ConversationDTO;
-import com.ttjobs.backend.dto.CreateConversationRequest;
+import com.ttjobs.backend.dto.conversation.ConversationDTO;
+import com.ttjobs.backend.dto.conversation.CreateConversationRequest;
 import com.ttjobs.backend.entity.Conversation;
 import com.ttjobs.backend.entity.ConversationMember;
 import com.ttjobs.backend.entity.User;
@@ -89,3 +89,4 @@ class ConversationServiceTest {
         return user;
     }
 }
+

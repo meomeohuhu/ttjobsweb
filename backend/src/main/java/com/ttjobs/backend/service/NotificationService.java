@@ -1,6 +1,6 @@
 package com.ttjobs.backend.service;
 
-import com.ttjobs.backend.dto.NotificationDTO;
+import com.ttjobs.backend.dto.notification.NotificationDTO;
 import com.ttjobs.backend.entity.Notification;
 import com.ttjobs.backend.entity.User;
 import com.ttjobs.backend.repository.NotificationRepository;
@@ -95,3 +95,4 @@ public class NotificationService {
         return dto;
     }
 }
+

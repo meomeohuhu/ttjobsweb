@@ -3,6 +3,8 @@ package com.ttjobs.backend.service;
 import com.ttjobs.backend.entity.Company;
 import com.ttjobs.backend.entity.Job;
 import com.ttjobs.backend.entity.User;
+import com.ttjobs.backend.dto.job.JobCategoryStatDTO;
+import com.ttjobs.backend.dto.job.JobDTO;
 import com.ttjobs.backend.repository.CompanyMemberRepository;
 import com.ttjobs.backend.repository.CompanyRepository;
 import com.ttjobs.backend.repository.JobCategoryCount;
@@ -42,6 +44,8 @@ class JobServiceTest {
     private CompanyAuthorizationService companyAuthorizationService;
     @Mock
     private AuthContextService authContextService;
+    @Mock
+    private CompanyVerificationStatusService companyVerificationStatusService;
 
     @InjectMocks
     private JobService jobService;
@@ -111,6 +115,30 @@ class JobServiceTest {
                 () -> jobService.createJob(job));
 
         assertEquals(403, ex.getStatusCode().value());
+    }
+
+    @Test
+    void createJob_shouldReturnBadRequest_whenPublishingUnverifiedCompany() {
+        User recruiter = user(1L, User.Role.RECRUITER);
+        Company company = new Company();
+        company.setId(11L);
+        company.setCreatedBy(recruiter);
+        company.setVerificationStatus(Company.VerificationStatus.PENDING);
+
+        Job job = new Job();
+        job.setCompany(company);
+        job.setTitle("Java Dev");
+        job.setStatus("open");
+
+        when(authContextService.requireCurrentUser()).thenReturn(recruiter);
+        when(authContextService.isAdmin(recruiter)).thenReturn(false);
+        when(companyRepository.findByIdAndDeletedAtIsNull(11L)).thenReturn(Optional.of(company));
+        doNothing().when(companyAuthorizationService).requireManageCompany(recruiter, company);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> jobService.createJob(job));
+
+        assertEquals(400, ex.getStatusCode().value());
     }
 
     @Test
@@ -197,7 +225,7 @@ class JobServiceTest {
         when(projection.getSavedCount()).thenReturn(9L);
         when(jobRepository.findHighlightedJobs(eq("open"), any(Pageable.class))).thenReturn(List.of(projection));
 
-        List<com.ttjobs.backend.dto.JobDTO> result = jobService.getHighlightedJobs(null, 100);
+        List<JobDTO> result = jobService.getHighlightedJobs(null, 100);
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         org.mockito.Mockito.verify(jobRepository).findHighlightedJobs(eq("open"), pageableCaptor.capture());
@@ -232,7 +260,7 @@ class JobServiceTest {
         when(projection.getSavedCount()).thenReturn(14L);
         when(jobRepository.findBestJobs(eq("open"), any(Pageable.class))).thenReturn(List.of(projection));
 
-        List<com.ttjobs.backend.dto.JobDTO> result = jobService.getBestJobs(null, 100);
+        List<JobDTO> result = jobService.getBestJobs(null, 100);
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         org.mockito.Mockito.verify(jobRepository).findBestJobs(eq("open"), pageableCaptor.capture());
@@ -257,7 +285,7 @@ class JobServiceTest {
         when(projection.getJobCount()).thenReturn(7L);
         when(jobRepository.findTopCategories(eq("open"), any(Pageable.class))).thenReturn(List.of(projection));
 
-        List<com.ttjobs.backend.dto.JobCategoryStatDTO> result = jobService.getTopCategories(100);
+        List<JobCategoryStatDTO> result = jobService.getTopCategories(100);
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         org.mockito.Mockito.verify(jobRepository).findTopCategories(eq("open"), pageableCaptor.capture());

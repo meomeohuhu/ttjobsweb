@@ -2,13 +2,15 @@ package com.ttjobs.backend.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ttjobs.backend.dto.JobDTO;
+import com.ttjobs.backend.dto.job.JobDTO;
 import com.ttjobs.backend.service.RecommendationService;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -41,6 +43,11 @@ public class RecommendationController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "cvText is required");
         }
         return recommendationService.recommendByCvText(cvText);
+    }
+
+    @PostMapping("/jobs/{jobId}/event")
+    public void recordRecommendationEvent(@PathVariable Long jobId, @RequestParam String eventType) {
+        recommendationService.recordRecommendationInteraction(jobId, eventType);
     }
 
     private String extractCvText(String body) {
@@ -90,3 +97,4 @@ public class RecommendationController {
         return value == null ? null : value.trim();
     }
 }
+

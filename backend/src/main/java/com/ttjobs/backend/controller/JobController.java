@@ -6,8 +6,8 @@ import jakarta.validation.constraints.Min;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import com.ttjobs.backend.entity.Job;
-import com.ttjobs.backend.dto.JobCategoryStatDTO;
-import com.ttjobs.backend.dto.JobDTO;
+import com.ttjobs.backend.dto.job.JobCategoryStatDTO;
+import com.ttjobs.backend.dto.job.JobDTO;
 import com.ttjobs.backend.service.JobService;
 import com.ttjobs.backend.exception.ResourceNotFoundException;
 import org.springframework.validation.annotation.Validated;
@@ -172,3 +172,4 @@ public class JobController {
         return Map.of("code", code, "province", province, "districts", districts);
     }
 }
+

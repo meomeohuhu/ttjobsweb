@@ -1,18 +1,18 @@
 package com.ttjobs.backend.controller;
 
-import com.ttjobs.backend.dto.BulkApplicationStatusRequest;
-import com.ttjobs.backend.dto.CandidateSearchDTO;
-import com.ttjobs.backend.dto.InterviewScheduleDTO;
-import com.ttjobs.backend.dto.InterviewScheduleRequest;
-import com.ttjobs.backend.dto.RecruiterDashboardDTO;
-import com.ttjobs.backend.dto.RecruiterApplicationDTO;
-import com.ttjobs.backend.dto.RecruiterApplicationDetailDTO;
-import com.ttjobs.backend.dto.RecruiterActivityLogDTO;
-import com.ttjobs.backend.dto.RecruiterCompanyDTO;
-import com.ttjobs.backend.dto.RecruiterJobDTO;
-import com.ttjobs.backend.dto.RecruiterReportDTO;
-import com.ttjobs.backend.dto.RecruitmentCampaignDTO;
-import com.ttjobs.backend.dto.RecruitmentCampaignRequest;
+import com.ttjobs.backend.dto.application.BulkApplicationStatusRequest;
+import com.ttjobs.backend.dto.recruiter.CandidateSearchDTO;
+import com.ttjobs.backend.dto.interview.InterviewScheduleDTO;
+import com.ttjobs.backend.dto.interview.InterviewScheduleRequest;
+import com.ttjobs.backend.dto.recruiter.RecruiterDashboardDTO;
+import com.ttjobs.backend.dto.recruiter.RecruiterApplicationDTO;
+import com.ttjobs.backend.dto.recruiter.RecruiterApplicationDetailDTO;
+import com.ttjobs.backend.dto.recruiter.RecruiterActivityLogDTO;
+import com.ttjobs.backend.dto.recruiter.RecruiterCompanyDTO;
+import com.ttjobs.backend.dto.recruiter.RecruiterJobDTO;
+import com.ttjobs.backend.dto.recruiter.RecruiterReportDTO;
+import com.ttjobs.backend.dto.recruiter.RecruitmentCampaignDTO;
+import com.ttjobs.backend.dto.recruiter.RecruitmentCampaignRequest;
 import com.ttjobs.backend.service.RecruiterDashboardService;
 import com.ttjobs.backend.service.RecruiterWorkspaceService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -140,3 +140,4 @@ public class RecruiterDashboardController {
         return recruiterDashboardService.getRecentActivities(limit);
     }
 }
+

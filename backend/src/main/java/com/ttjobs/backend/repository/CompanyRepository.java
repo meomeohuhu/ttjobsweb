@@ -8,5 +8,6 @@ import java.util.Optional;
 
 public interface CompanyRepository extends JpaRepository<Company, Long> {
     List<Company> findByDeletedAtIsNull();
+    List<Company> findByDeletedAtIsNullAndVerificationStatus(Company.VerificationStatus verificationStatus);
     Optional<Company> findByIdAndDeletedAtIsNull(Long id);
 }

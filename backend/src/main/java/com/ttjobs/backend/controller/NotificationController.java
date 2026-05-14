@@ -1,8 +1,8 @@
 package com.ttjobs.backend.controller;
 
-import com.ttjobs.backend.dto.NotificationDTO;
-import com.ttjobs.backend.dto.NotificationPreferenceDTO;
-import com.ttjobs.backend.dto.NotificationPreferenceRequest;
+import com.ttjobs.backend.dto.notification.NotificationDTO;
+import com.ttjobs.backend.dto.notification.NotificationPreferenceDTO;
+import com.ttjobs.backend.dto.notification.NotificationPreferenceRequest;
 import com.ttjobs.backend.service.NotificationService;
 import com.ttjobs.backend.service.NotificationPreferenceService;
 import jakarta.validation.constraints.Max;
@@ -62,3 +62,4 @@ public class NotificationController {
         return preferenceService.updateMyPreferences(request);
     }
 }
+

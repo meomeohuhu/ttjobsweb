@@ -1,6 +1,6 @@
 package com.ttjobs.backend.controller;
 
-import com.ttjobs.backend.dto.SavedJobDTO;
+import com.ttjobs.backend.dto.job.SavedJobDTO;
 import com.ttjobs.backend.service.JwtService;
 import com.ttjobs.backend.service.SavedJobService;
 import org.junit.jupiter.api.Test;
@@ -73,3 +73,4 @@ class SavedJobControllerApiTest {
                 .andExpect(status().isOk());
     }
 }
+

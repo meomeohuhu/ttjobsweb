@@ -1,6 +1,6 @@
 package com.ttjobs.backend.service;
 
-import com.ttjobs.backend.dto.NotificationPreferenceRequest;
+import com.ttjobs.backend.dto.notification.NotificationPreferenceRequest;
 import com.ttjobs.backend.entity.NotificationPreference;
 import com.ttjobs.backend.entity.User;
 import com.ttjobs.backend.repository.NotificationPreferenceRepository;
@@ -62,3 +62,4 @@ class NotificationPreferenceServiceTest {
         return user;
     }
 }
+

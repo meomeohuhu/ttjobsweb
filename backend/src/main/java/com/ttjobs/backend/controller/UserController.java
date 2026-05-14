@@ -1,18 +1,18 @@
 package com.ttjobs.backend.controller;
 
-import com.ttjobs.backend.dto.CandidateDashboardDTO;
-import com.ttjobs.backend.dto.InterviewScheduleDTO;
-import com.ttjobs.backend.dto.UserCvDTO;
-import com.ttjobs.backend.dto.UserCvTextDTO;
-import com.ttjobs.backend.dto.UserAvatarDTO;
-import com.ttjobs.backend.dto.UserProfileDTO;
-import com.ttjobs.backend.dto.EmailChangeConfirmRequest;
-import com.ttjobs.backend.dto.EmailChangeRequest;
-import com.ttjobs.backend.dto.EmailChangeResponse;
-import com.ttjobs.backend.dto.PersonalityProfileDTO;
-import com.ttjobs.backend.dto.SavePersonalityRequest;
-import com.ttjobs.backend.dto.ChangePasswordRequest;
-import com.ttjobs.backend.dto.UpdateMyProfileRequest;
+import com.ttjobs.backend.dto.user.CandidateDashboardDTO;
+import com.ttjobs.backend.dto.interview.InterviewScheduleDTO;
+import com.ttjobs.backend.dto.user.UserCvDTO;
+import com.ttjobs.backend.dto.user.UserCvTextDTO;
+import com.ttjobs.backend.dto.user.UserAvatarDTO;
+import com.ttjobs.backend.dto.user.UserProfileDTO;
+import com.ttjobs.backend.dto.auth.EmailChangeConfirmRequest;
+import com.ttjobs.backend.dto.auth.EmailChangeRequest;
+import com.ttjobs.backend.dto.auth.EmailChangeResponse;
+import com.ttjobs.backend.dto.user.PersonalityProfileDTO;
+import com.ttjobs.backend.dto.user.SavePersonalityRequest;
+import com.ttjobs.backend.dto.auth.ChangePasswordRequest;
+import com.ttjobs.backend.dto.user.UpdateMyProfileRequest;
 import com.ttjobs.backend.service.CandidateDashboardService;
 import com.ttjobs.backend.service.UserAvatarService;
 import com.ttjobs.backend.service.UserCvService;
@@ -21,35 +21,42 @@ import com.ttjobs.backend.service.UserProfileService;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.util.List;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api")
 public class UserController {
 
-    @Autowired
-    private UserCvService userCvService;
-    @Autowired
-    private UserAvatarService userAvatarService;
-    @Autowired
-    private UserProfileService userProfileService;
-    @Autowired
-    private UserInterviewService userInterviewService;
-    @Autowired
-    private CandidateDashboardService candidateDashboardService;
+    private final UserCvService userCvService;
+    private final UserAvatarService userAvatarService;
+    private final UserProfileService userProfileService;
+    private final UserInterviewService userInterviewService;
+    private final CandidateDashboardService candidateDashboardService;
+
+    public UserController(
+            UserCvService userCvService,
+            UserAvatarService userAvatarService,
+            UserProfileService userProfileService,
+            UserInterviewService userInterviewService,
+            CandidateDashboardService candidateDashboardService) {
+        this.userCvService = userCvService;
+        this.userAvatarService = userAvatarService;
+        this.userProfileService = userProfileService;
+        this.userInterviewService = userInterviewService;
+        this.candidateDashboardService = candidateDashboardService;
+    }
 
     @GetMapping("/admin/test")
     public String adminTest() {
@@ -188,3 +195,4 @@ public class UserController {
         userAvatarService.deleteMyAvatar();
     }
 }
+

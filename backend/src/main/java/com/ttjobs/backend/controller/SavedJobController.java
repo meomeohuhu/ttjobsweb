@@ -1,6 +1,6 @@
 package com.ttjobs.backend.controller;
 
-import com.ttjobs.backend.dto.SavedJobDTO;
+import com.ttjobs.backend.dto.job.SavedJobDTO;
 import com.ttjobs.backend.service.SavedJobService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -34,3 +34,4 @@ public class SavedJobController {
         savedJobService.unsaveJob(jobId);
     }
 }
+

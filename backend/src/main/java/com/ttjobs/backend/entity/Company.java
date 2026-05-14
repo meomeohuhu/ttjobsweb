@@ -22,6 +22,13 @@ import java.util.List;
 @Data
 public class Company {
 
+    public enum VerificationStatus {
+        PENDING,
+        VERIFIED,
+        REJECTED,
+        SUSPENDED
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -38,6 +45,9 @@ public class Company {
     @JoinColumn(name = "created_by")
     private User createdBy;
     private String logoUrl;
+    @jakarta.persistence.Enumerated(jakarta.persistence.EnumType.STRING)
+    @Column(nullable = false)
+    private VerificationStatus verificationStatus = VerificationStatus.PENDING;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime deletedAt;
@@ -47,6 +57,9 @@ public class Company {
         LocalDateTime now = LocalDateTime.now();
         if (createdAt == null) {
             createdAt = now;
+        }
+        if (verificationStatus == null) {
+            verificationStatus = VerificationStatus.PENDING;
         }
         updatedAt = now;
     }

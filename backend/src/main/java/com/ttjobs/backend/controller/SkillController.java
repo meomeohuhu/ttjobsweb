@@ -1,7 +1,7 @@
 package com.ttjobs.backend.controller;
 
-import com.ttjobs.backend.dto.CreateSkillRequest;
-import com.ttjobs.backend.dto.SkillDTO;
+import com.ttjobs.backend.dto.skill.CreateSkillRequest;
+import com.ttjobs.backend.dto.skill.SkillDTO;
 import com.ttjobs.backend.service.SkillService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,3 +31,4 @@ public class SkillController {
         return skillService.createSkill(request);
     }
 }
+

@@ -1,9 +1,9 @@
 package com.ttjobs.backend.service;
 
-import com.ttjobs.backend.dto.CandidateDashboardDTO;
-import com.ttjobs.backend.dto.InterviewScheduleDTO;
-import com.ttjobs.backend.dto.JobApplicationDTO;
-import com.ttjobs.backend.dto.JobDTO;
+import com.ttjobs.backend.dto.user.CandidateDashboardDTO;
+import com.ttjobs.backend.dto.interview.InterviewScheduleDTO;
+import com.ttjobs.backend.dto.application.JobApplicationDTO;
+import com.ttjobs.backend.dto.job.JobDTO;
 import com.ttjobs.backend.entity.ConversationMember;
 import com.ttjobs.backend.entity.InterviewSchedule;
 import com.ttjobs.backend.entity.JobApplication;
@@ -185,3 +185,4 @@ public class CandidateDashboardService {
         return value != null && !value.isBlank();
     }
 }
+

@@ -1,6 +1,6 @@
 package com.ttjobs.backend.controller;
 
-import com.ttjobs.backend.dto.CareerGuideArticleDTO;
+import com.ttjobs.backend.dto.career.CareerGuideArticleDTO;
 import com.ttjobs.backend.service.CareerGuideService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,3 +27,4 @@ public class CareerGuideController {
         return careerGuideService.getArticleBySlug(slug);
     }
 }
+

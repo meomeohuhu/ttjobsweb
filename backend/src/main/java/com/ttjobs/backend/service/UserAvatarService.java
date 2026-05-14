@@ -2,7 +2,7 @@ package com.ttjobs.backend.service;
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
-import com.ttjobs.backend.dto.UserAvatarDTO;
+import com.ttjobs.backend.dto.user.UserAvatarDTO;
 import com.ttjobs.backend.entity.User;
 import com.ttjobs.backend.repository.UserRepository;
 import org.springframework.beans.factory.ObjectProvider;
@@ -143,3 +143,4 @@ public class UserAvatarService {
         return dto;
     }
 }
+

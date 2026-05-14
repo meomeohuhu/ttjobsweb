@@ -59,6 +59,18 @@ class SecurityAuthorizationIntegrationTest {
     }
 
     @Test
+    void adminEndpoint_shouldUseCurrentDatabaseRole_whenTokenHasOldRole() throws Exception {
+        User user = createUser(User.Role.CANDIDATE);
+        String token = bearerToken(user);
+        user.setRole(User.Role.ADMIN);
+        userRepository.save(user);
+
+        mockMvc.perform(get("/api/admin/test")
+                        .header("Authorization", token))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void recruiterMyJobsApplications_shouldReturnForbidden_forCandidateToken() throws Exception {
         User candidate = createUser(User.Role.CANDIDATE);
         String token = bearerToken(candidate);
@@ -93,9 +105,9 @@ class SecurityAuthorizationIntegrationTest {
     }
 
     @Test
-    void swaggerUi_shouldBePublic() throws Exception {
+    void swaggerUi_shouldRequireAuthentication() throws Exception {
         mockMvc.perform(get("/swagger-ui/index.html"))
-                .andExpect(status().isOk());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

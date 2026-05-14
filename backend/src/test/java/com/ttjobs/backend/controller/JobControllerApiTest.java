@@ -1,8 +1,8 @@
 package com.ttjobs.backend.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ttjobs.backend.dto.JobCategoryStatDTO;
-import com.ttjobs.backend.dto.JobDTO;
+import com.ttjobs.backend.dto.job.JobCategoryStatDTO;
+import com.ttjobs.backend.dto.job.JobDTO;
 import com.ttjobs.backend.entity.Company;
 import com.ttjobs.backend.entity.Job;
 import com.ttjobs.backend.service.JobService;
@@ -208,3 +208,4 @@ class JobControllerApiTest {
                 .andExpect(jsonPath("$[0].title").value("Company Job"));
     }
 }
+
