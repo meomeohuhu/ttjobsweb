@@ -2,6 +2,7 @@ package com.ttjobs.backend.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ttjobs.backend.dto.CompanyDTO;
+import com.ttjobs.backend.dto.CompanyRequest;
 import com.ttjobs.backend.dto.CompanyMemberDTO;
 import com.ttjobs.backend.dto.CompanyMemberUpsertRequest;
 import com.ttjobs.backend.dto.CompanyPublicPageDTO;
@@ -17,6 +18,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
+
+import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -43,6 +46,18 @@ class CompanyControllerApiTest {
     private CompanyService companyService;
     @MockBean
     private JwtService jwtService;
+
+    @Test
+    void getTopCompaniesBySavedJobs_shouldReturnBadRequest_whenLimitTooLow() throws Exception {
+        mockMvc.perform(get("/api/companies/top-saved-jobs?limit=0"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getTopCompaniesBySavedJobs_shouldReturnBadRequest_whenLimitTooHigh() throws Exception {
+        mockMvc.perform(get("/api/companies/top-saved-jobs?limit=101"))
+                .andExpect(status().isBadRequest());
+    }
 
     @Test
     void getTopCompaniesBySavedJobs_shouldReturnList() throws Exception {
@@ -99,6 +114,57 @@ class CompanyControllerApiTest {
                 .andExpect(jsonPath("$.company.id").value(7))
                 .andExpect(jsonPath("$.company.name").value("Acme"))
                 .andExpect(jsonPath("$.jobs[0].title").value("Java Developer"));
+    }
+
+    @Test
+    void getCompanyById_shouldReturnNotFound_whenCompanyDoesNotExist() throws Exception {
+        when(companyService.getCompanyById(999L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/companies/999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Company not found"));
+    }
+
+    @Test
+    void createCompany_shouldReturnBadRequest_whenNameMissing() throws Exception {
+        CompanyRequest req = new CompanyRequest();
+        // name is missing
+
+        mockMvc.perform(post("/api/companies")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Validation failed"))
+                .andExpect(jsonPath("$.errors.name").value("Company name is required"));
+    }
+
+    @Test
+    void createCompany_shouldReturnOk() throws Exception {
+        CompanyRequest req = new CompanyRequest();
+        req.setName("New Company");
+
+        CompanyDTO dto = new CompanyDTO();
+        dto.setId(1L);
+        dto.setName("New Company");
+
+        when(companyService.createCompany(any(CompanyRequest.class))).thenReturn(dto);
+
+        mockMvc.perform(post("/api/companies")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("New Company"));
+    }
+
+    @Test
+    void updateCompany_shouldReturnBadRequest_whenNameMissing() throws Exception {
+        CompanyRequest req = new CompanyRequest();
+        // name is missing
+
+        mockMvc.perform(put("/api/companies/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
