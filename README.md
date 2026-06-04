@@ -2,6 +2,8 @@
 
 TTJobs is a Spring Boot + React job platform with recruiter/candidate flows, admin management, forum/community, realtime messaging, AI matching, and 1-1 interview rooms.
 
+Detailed Vietnamese project documentation: [PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md)
+
 ## Local Development
 
 Requirements:
