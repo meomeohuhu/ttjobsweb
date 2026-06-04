@@ -17,6 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -98,12 +99,7 @@ public class UserCvService {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CV file is required");
         }
-        if (file.getSize() > MAX_CV_SIZE) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CV file size exceeds 5MB");
-        }
-        if (!ALLOWED_CONTENT_TYPES.contains(file.getContentType())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only PDF/DOC/DOCX files are allowed");
-        }
+        validateCvFile(file);
 
         Cloudinary cloudinary = requireCloudinary();
         removeExistingCvIfPossible(cloudinary, currentUser.getCvUrl());
@@ -154,8 +150,7 @@ public class UserCvService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "CV not found");
         }
 
-        Cloudinary cloudinary = requireCloudinary();
-        removeExistingCvIfPossible(cloudinary, currentUser.getCvUrl());
+        removeExistingCvIfPossible(cloudinaryProvider.getIfAvailable(), currentUser.getCvUrl());
         currentUser.setCvUrl(null);
         currentUser.setCvText(null);
         userRepository.save(currentUser);
@@ -166,8 +161,7 @@ public class UserCvService {
         UserCv cv = userCvRepository.findByIdAndUserId(id, currentUser.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "CV not found"));
 
-        Cloudinary cloudinary = requireCloudinary();
-        removeExistingCvIfPossible(cloudinary, cv.getCvUrl());
+        removeExistingCvIfPossible(cloudinaryProvider.getIfAvailable(), cv.getCvUrl());
 
         if (cv.getCvUrl() != null && cv.getCvUrl().equals(currentUser.getCvUrl())) {
             currentUser.setCvUrl(null);
@@ -205,6 +199,9 @@ public class UserCvService {
     }
 
     private void removeExistingCvIfPossible(Cloudinary cloudinary, String existingCvUrl) {
+        if (cloudinary == null) {
+            return;
+        }
         String publicId = extractPublicId(existingCvUrl);
         if (publicId == null) {
             return;
@@ -363,6 +360,47 @@ public class UserCvService {
             output.write(buffer, 0, read);
         }
         return output.toByteArray();
+    }
+
+    private void validateCvFile(MultipartFile file) {
+        if (file.getSize() > MAX_CV_SIZE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CV file size exceeds 5MB");
+        }
+        if (!ALLOWED_CONTENT_TYPES.contains(file.getContentType())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only PDF/DOC/DOCX files are allowed");
+        }
+        validateCvSignature(file);
+    }
+
+    private void validateCvSignature(MultipartFile file) {
+        try (InputStream input = file.getInputStream()) {
+            byte[] header = input.readNBytes(8);
+            String contentType = file.getContentType();
+            boolean valid = switch (contentType == null ? "" : contentType) {
+                case "application/pdf" -> startsWith(header, 0x25, 0x50, 0x44, 0x46);
+                case "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ->
+                        startsWith(header, 0x50, 0x4B);
+                case "application/msword" -> startsWith(header, 0xD0, 0xCF, 0x11, 0xE0);
+                default -> false;
+            };
+            if (!valid) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid CV file content");
+            }
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid CV file content");
+        }
+    }
+
+    private boolean startsWith(byte[] data, int... expected) {
+        if (data.length < expected.length) {
+            return false;
+        }
+        for (int i = 0; i < expected.length; i++) {
+            if ((data[i] & 0xFF) != expected[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 }
 

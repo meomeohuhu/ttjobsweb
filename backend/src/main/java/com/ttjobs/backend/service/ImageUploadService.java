@@ -10,6 +10,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Map;
 import java.util.Set;
 
@@ -36,6 +37,7 @@ public class ImageUploadService {
         if (!ALLOWED_CONTENT_TYPES.contains(file.getContentType())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only JPG/PNG/WEBP files are allowed");
         }
+        validateImageSignature(file);
 
         Cloudinary cloudinary = cloudinaryProvider.getIfAvailable();
         if (cloudinary == null) {
@@ -59,6 +61,39 @@ public class ImageUploadService {
             return imageUrl;
         } catch (IOException e) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Cloud upload failed");
+        }
+    }
+
+    private void validateImageSignature(MultipartFile file) {
+        try (InputStream input = file.getInputStream()) {
+            byte[] header = input.readNBytes(12);
+            String contentType = file.getContentType();
+            boolean valid = switch (contentType == null ? "" : contentType) {
+                case "image/jpeg" -> header.length >= 3
+                        && (header[0] & 0xFF) == 0xFF
+                        && (header[1] & 0xFF) == 0xD8
+                        && (header[2] & 0xFF) == 0xFF;
+                case "image/png" -> header.length >= 8
+                        && (header[0] & 0xFF) == 0x89
+                        && header[1] == 0x50
+                        && header[2] == 0x4E
+                        && header[3] == 0x47;
+                case "image/webp" -> header.length >= 12
+                        && header[0] == 0x52
+                        && header[1] == 0x49
+                        && header[2] == 0x46
+                        && header[3] == 0x46
+                        && header[8] == 0x57
+                        && header[9] == 0x45
+                        && header[10] == 0x42
+                        && header[11] == 0x50;
+                default -> false;
+            };
+            if (!valid) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid image file content");
+            }
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid image file content");
         }
     }
 }

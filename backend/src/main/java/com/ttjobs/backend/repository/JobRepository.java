@@ -1,5 +1,6 @@
 package com.ttjobs.backend.repository;
 
+import com.ttjobs.backend.entity.Company;
 import com.ttjobs.backend.entity.CompanyMember;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -46,11 +47,13 @@ public interface JobRepository extends JpaRepository<Job, Long>, JpaSpecificatio
     @Query("SELECT j as job, COUNT(sj.id) as savedCount " +
            "FROM Job j LEFT JOIN SavedJob sj ON sj.job = j " +
            "WHERE j.deletedAt IS NULL AND j.company.deletedAt IS NULL AND " +
+           "j.company.verificationStatus = :verificationStatus AND " +
            "j.company.id = :companyId AND LOWER(j.status) = LOWER(:status) " +
            "AND (j.applicationDeadline IS NULL OR j.applicationDeadline >= CURRENT_TIMESTAMP) " +
            "GROUP BY j ORDER BY j.postedDate DESC")
     List<JobWithSavedCount> findCompanyJobsWithSavedCount(@Param("companyId") Long companyId,
                                                           @Param("status") String status,
+                                                          @Param("verificationStatus") Company.VerificationStatus verificationStatus,
                                                           Pageable pageable);
 
     @Query("SELECT j FROM Job j WHERE j.deletedAt IS NULL AND j.company.deletedAt IS NULL AND " +
@@ -63,31 +66,43 @@ public interface JobRepository extends JpaRepository<Job, Long>, JpaSpecificatio
     @Query("SELECT j as job, COUNT(sj.id) as savedCount " +
            "FROM Job j LEFT JOIN SavedJob sj ON sj.job = j " +
            "WHERE j.deletedAt IS NULL AND j.company.deletedAt IS NULL AND j.status = :status " +
+           "AND j.company.verificationStatus = :verificationStatus " +
            "AND (j.applicationDeadline IS NULL OR j.applicationDeadline >= CURRENT_TIMESTAMP) " +
            "GROUP BY j")
-    List<JobWithSavedCount> findJobsWithSavedCount(@Param("status") String status, Pageable pageable);
+    List<JobWithSavedCount> findJobsWithSavedCount(@Param("status") String status,
+                                                   @Param("verificationStatus") Company.VerificationStatus verificationStatus,
+                                                   Pageable pageable);
 
     @Query("SELECT j as job, COUNT(sj.id) as savedCount " +
            "FROM Job j LEFT JOIN SavedJob sj ON sj.job = j " +
            "WHERE j.deletedAt IS NULL AND j.company.deletedAt IS NULL AND LOWER(j.status) = LOWER(:status) " +
+           "AND j.company.verificationStatus = :verificationStatus " +
            "AND (j.applicationDeadline IS NULL OR j.applicationDeadline >= CURRENT_TIMESTAMP) " +
            "GROUP BY j " +
            "ORDER BY COALESCE(j.salaryMax, j.salary, j.salaryMin, 0) DESC, COUNT(sj.id) DESC, j.postedDate DESC")
-    List<JobWithSavedCount> findHighlightedJobs(@Param("status") String status, Pageable pageable);
+    List<JobWithSavedCount> findHighlightedJobs(@Param("status") String status,
+                                                @Param("verificationStatus") Company.VerificationStatus verificationStatus,
+                                                Pageable pageable);
 
     @Query("SELECT j as job, COUNT(sj.id) as savedCount " +
            "FROM Job j LEFT JOIN SavedJob sj ON sj.job = j " +
            "WHERE j.deletedAt IS NULL AND j.company.deletedAt IS NULL AND LOWER(j.status) = LOWER(:status) " +
+           "AND j.company.verificationStatus = :verificationStatus " +
            "AND (j.applicationDeadline IS NULL OR j.applicationDeadline >= CURRENT_TIMESTAMP) " +
            "GROUP BY j " +
            "ORDER BY COUNT(sj.id) DESC, j.postedDate DESC")
-    List<JobWithSavedCount> findBestJobs(@Param("status") String status, Pageable pageable);
+    List<JobWithSavedCount> findBestJobs(@Param("status") String status,
+                                         @Param("verificationStatus") Company.VerificationStatus verificationStatus,
+                                         Pageable pageable);
 
     @Query("SELECT j.category as category, COUNT(j.id) as jobCount " +
            "FROM Job j " +
            "WHERE j.deletedAt IS NULL AND j.company.deletedAt IS NULL AND LOWER(j.status) = LOWER(:status) " +
+           "AND j.company.verificationStatus = :verificationStatus " +
            "AND (j.applicationDeadline IS NULL OR j.applicationDeadline >= CURRENT_TIMESTAMP) " +
            "GROUP BY j.category " +
            "ORDER BY COUNT(j.id) DESC")
-    List<JobCategoryCount> findTopCategories(@Param("status") String status, Pageable pageable);
+    List<JobCategoryCount> findTopCategories(@Param("status") String status,
+                                             @Param("verificationStatus") Company.VerificationStatus verificationStatus,
+                                             Pageable pageable);
 }

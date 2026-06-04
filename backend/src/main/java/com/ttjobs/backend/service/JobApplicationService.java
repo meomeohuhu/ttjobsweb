@@ -25,6 +25,7 @@ import org.springframework.web.server.ResponseStatusException;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.LocalDateTime;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -188,6 +189,10 @@ public class JobApplicationService {
         }
         Optional<JobApplication> existingApplication = jobApplicationRepository.findByUserIdAndJobId(currentUser.getId(), jobId);
         if (existingApplication.isPresent()) {
+            JobApplication existing = existingApplication.get();
+            if (WITHDRAWN.equals(normalizeStatus(existing.getStatus()))) {
+                return reapplyForWithdrawnApplication(existing, currentUser, file, cvId, useProfileCv, useSystemCv, saveToCvList, coverLetter);
+            }
             throw new ResponseStatusException(HttpStatus.CONFLICT, "User has already applied for this job");
         }
 
@@ -233,6 +238,55 @@ public class JobApplicationService {
             emailService.sendNewApplication(job.getCompany().getCreatedBy(), user, job);
         }
         recordAiEvent(user, job, "application_created", saved.getCvTextSnapshot());
+        return convertToDTO(saved);
+    }
+
+    private JobApplicationDTO reapplyForWithdrawnApplication(JobApplication application, User currentUser,
+                                                             MultipartFile file, Long cvId, boolean useProfileCv,
+                                                             boolean useSystemCv, boolean saveToCvList,
+                                                             String coverLetter) {
+        User user = userRepository.findById(currentUser.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        Job job = jobRepository.findByIdAndDeletedAtIsNull(application.getJob().getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
+
+        if (!"open".equalsIgnoreCase(job.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Job is not open for application");
+        }
+        if (job.getApplicationDeadline() != null && LocalDateTime.now().isAfter(job.getApplicationDeadline())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Application deadline has passed");
+        }
+
+        application.setUser(user);
+        application.setJob(job);
+        application.setApplicationDate(LocalDateTime.now());
+        application.setStatus(SUBMITTED);
+        application.setCoverLetter(coverLetter == null || coverLetter.isBlank() ? null : coverLetter.trim());
+        application.setCv(null);
+        application.setCvUrl(null);
+        application.setCvFileName(null);
+        application.setCvTextSnapshot(null);
+        attachCvSnapshot(application, user, file, cvId, useProfileCv, useSystemCv, saveToCvList);
+
+        JobApplication saved = jobApplicationRepository.save(application);
+        logStatusChange(saved, currentUser, WITHDRAWN, SUBMITTED);
+        notificationService.createNotification(
+                user,
+                "Application resubmitted",
+                "You have successfully reapplied to " + job.getTitle(),
+                "APPLICATION_SUBMITTED"
+        );
+        emailService.sendApplicationSubmitted(user, job);
+        if (job.getCompany() != null && job.getCompany().getCreatedBy() != null) {
+            notificationService.createNotification(
+                    job.getCompany().getCreatedBy(),
+                    "Job application resubmitted",
+                    user.getName() + " reapplied to " + job.getTitle(),
+                    "NEW_APPLICATION"
+            );
+            emailService.sendNewApplication(job.getCompany().getCreatedBy(), user, job);
+        }
+        recordAiEvent(user, job, "application_resubmitted", saved.getCvTextSnapshot());
         return convertToDTO(saved);
     }
 
@@ -523,6 +577,7 @@ public class JobApplicationService {
         if (!ALLOWED_CONTENT_TYPES.contains(file.getContentType())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only PDF/DOC/DOCX files are allowed");
         }
+        validateCvSignature(file);
     }
 
     private Cloudinary requireCloudinary() {
@@ -656,6 +711,37 @@ public class JobApplicationService {
             output.write(buffer, 0, read);
         }
         return output.toByteArray();
+    }
+
+    private void validateCvSignature(MultipartFile file) {
+        try (InputStream input = file.getInputStream()) {
+            byte[] header = input.readNBytes(8);
+            String contentType = file.getContentType();
+            boolean valid = switch (contentType == null ? "" : contentType) {
+                case "application/pdf" -> startsWith(header, 0x25, 0x50, 0x44, 0x46);
+                case "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ->
+                        startsWith(header, 0x50, 0x4B);
+                case "application/msword" -> startsWith(header, 0xD0, 0xCF, 0x11, 0xE0);
+                default -> false;
+            };
+            if (!valid) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid CV file content");
+            }
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid CV file content");
+        }
+    }
+
+    private boolean startsWith(byte[] data, int... expected) {
+        if (data.length < expected.length) {
+            return false;
+        }
+        for (int i = 0; i < expected.length; i++) {
+            if ((data[i] & 0xFF) != expected[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private void recordAiEvent(User user, Job job, String eventType, String cvText) {

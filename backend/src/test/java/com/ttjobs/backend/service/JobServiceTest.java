@@ -209,6 +209,33 @@ class JobServiceTest {
     }
 
     @Test
+    void getAllJobs_shouldQueryOnlyVerifiedCompanyJobs() {
+        Company company = new Company();
+        company.setId(7L);
+        company.setName("Verified Company");
+        company.setVerificationStatus(Company.VerificationStatus.VERIFIED);
+
+        Job job = new Job();
+        job.setId(20L);
+        job.setTitle("Verified Job");
+        job.setStatus("open");
+        job.setCompany(company);
+
+        JobWithSavedCount projection = mock(JobWithSavedCount.class);
+        when(projection.getJob()).thenReturn(job);
+        when(projection.getSavedCount()).thenReturn(2L);
+        when(jobRepository.findJobsWithSavedCount(eq("open"), eq(Company.VerificationStatus.VERIFIED), any(Pageable.class)))
+                .thenReturn(List.of(projection));
+
+        List<JobDTO> result = jobService.getAllJobs();
+
+        org.mockito.Mockito.verify(jobRepository)
+                .findJobsWithSavedCount(eq("open"), eq(Company.VerificationStatus.VERIFIED), any(Pageable.class));
+        assertEquals(1, result.size());
+        assertEquals("Verified Job", result.get(0).getTitle());
+    }
+
+    @Test
     void getHighlightedJobs_shouldClampSizeAndMapSavedCount() {
         Company company = new Company();
         company.setId(7L);
@@ -223,12 +250,14 @@ class JobServiceTest {
         JobWithSavedCount projection = mock(JobWithSavedCount.class);
         when(projection.getJob()).thenReturn(job);
         when(projection.getSavedCount()).thenReturn(9L);
-        when(jobRepository.findHighlightedJobs(eq("open"), any(Pageable.class))).thenReturn(List.of(projection));
+        when(jobRepository.findHighlightedJobs(eq("open"), eq(Company.VerificationStatus.VERIFIED), any(Pageable.class)))
+                .thenReturn(List.of(projection));
 
         List<JobDTO> result = jobService.getHighlightedJobs(null, 100);
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        org.mockito.Mockito.verify(jobRepository).findHighlightedJobs(eq("open"), pageableCaptor.capture());
+        org.mockito.Mockito.verify(jobRepository)
+                .findHighlightedJobs(eq("open"), eq(Company.VerificationStatus.VERIFIED), pageableCaptor.capture());
         assertEquals(50, pageableCaptor.getValue().getPageSize());
         assertEquals(1, result.size());
         assertEquals(20L, result.get(0).getId());
@@ -258,12 +287,14 @@ class JobServiceTest {
         JobWithSavedCount projection = mock(JobWithSavedCount.class);
         when(projection.getJob()).thenReturn(job);
         when(projection.getSavedCount()).thenReturn(14L);
-        when(jobRepository.findBestJobs(eq("open"), any(Pageable.class))).thenReturn(List.of(projection));
+        when(jobRepository.findBestJobs(eq("open"), eq(Company.VerificationStatus.VERIFIED), any(Pageable.class)))
+                .thenReturn(List.of(projection));
 
         List<JobDTO> result = jobService.getBestJobs(null, 100);
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        org.mockito.Mockito.verify(jobRepository).findBestJobs(eq("open"), pageableCaptor.capture());
+        org.mockito.Mockito.verify(jobRepository)
+                .findBestJobs(eq("open"), eq(Company.VerificationStatus.VERIFIED), pageableCaptor.capture());
         assertEquals(50, pageableCaptor.getValue().getPageSize());
         assertEquals(1, result.size());
         assertEquals(21L, result.get(0).getId());
@@ -283,12 +314,14 @@ class JobServiceTest {
         JobCategoryCount projection = mock(JobCategoryCount.class);
         when(projection.getCategory()).thenReturn("SALES");
         when(projection.getJobCount()).thenReturn(7L);
-        when(jobRepository.findTopCategories(eq("open"), any(Pageable.class))).thenReturn(List.of(projection));
+        when(jobRepository.findTopCategories(eq("open"), eq(Company.VerificationStatus.VERIFIED), any(Pageable.class)))
+                .thenReturn(List.of(projection));
 
         List<JobCategoryStatDTO> result = jobService.getTopCategories(100);
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        org.mockito.Mockito.verify(jobRepository).findTopCategories(eq("open"), pageableCaptor.capture());
+        org.mockito.Mockito.verify(jobRepository)
+                .findTopCategories(eq("open"), eq(Company.VerificationStatus.VERIFIED), pageableCaptor.capture());
         assertEquals(24, pageableCaptor.getValue().getPageSize());
         assertEquals(1, result.size());
         assertEquals("SALES", result.get(0).getCategory());

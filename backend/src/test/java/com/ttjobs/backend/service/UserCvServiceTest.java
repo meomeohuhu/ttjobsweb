@@ -52,7 +52,7 @@ class UserCvServiceTest {
     void uploadMyCv_shouldReturnServiceUnavailable_whenCloudinaryNotConfigured() {
         User user = user(1L);
         MockMultipartFile file = new MockMultipartFile(
-                "file", "cv.pdf", "application/pdf", "dummy".getBytes()
+                "file", "cv.pdf", "application/pdf", "%PDF-1.4".getBytes()
         );
 
         when(authContextService.requireCurrentUser()).thenReturn(user);
@@ -68,7 +68,7 @@ class UserCvServiceTest {
     void uploadMyCv_shouldSaveCvUrl_whenUploadSuccess() throws IOException {
         User user = user(2L);
         MockMultipartFile file = new MockMultipartFile(
-                "file", "cv.pdf", "application/pdf", "hello".getBytes()
+                "file", "cv.pdf", "application/pdf", "%PDF-1.4".getBytes()
         );
 
         when(authContextService.requireCurrentUser()).thenReturn(user);

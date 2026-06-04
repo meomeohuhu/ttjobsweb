@@ -39,12 +39,15 @@ public class SecurityConfig {
 
     private final JwtFilter jwtFilter;
     private final String configuredAllowedOrigins;
+    private final String appBaseUrl;
 
     public SecurityConfig(
             JwtFilter jwtFilter,
-            @Value("${ttjobs.cors.allowed-origins:}") String configuredAllowedOrigins) {
+            @Value("${ttjobs.cors.allowed-origins:}") String configuredAllowedOrigins,
+            @Value("${ttjobs.app.base-url:}") String appBaseUrl) {
         this.jwtFilter = jwtFilter;
         this.configuredAllowedOrigins = configuredAllowedOrigins;
+        this.appBaseUrl = appBaseUrl;
     }
 
     @Bean
@@ -74,6 +77,7 @@ public class SecurityConfig {
                         "/api/companies/top-saved-jobs",
                         "/api/companies/*",
                         "/api/companies/*/jobs",
+                        "/api/companies/*/reviews",
                         "/api/companies/*/public-page",
                         "/api/companies/*/follow-status").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/career-guides/**").permitAll()
@@ -93,11 +97,14 @@ public class SecurityConfig {
                 .requestMatchers("/api/users/**").authenticated()
                 // Company, jobs, applications, saved jobs and notifications are protected APIs.
                 .requestMatchers("/api/companies/**", "/api/jobs/**", "/api/applications/**", "/api/saved-jobs/**", "/api/notifications/**", "/api/conversations/**", "/api/recommendations/**").authenticated()
-                // Keep other routes open for now (you can tighten this later).
-                .anyRequest().permitAll()
+                // Deny-by-default posture for routes not explicitly listed above.
+                .anyRequest().authenticated()
             )
-            // Return 401 for unauthenticated requests; keep 403 for access denied.
-            .exceptionHandling(ex -> ex.authenticationEntryPoint(unauthorizedEntryPoint))
+            // Return 401 for unauthenticated requests; keep 403 for authenticated users without a role.
+            .exceptionHandling(ex -> ex
+                    .authenticationEntryPoint(unauthorizedEntryPoint)
+                    .accessDeniedHandler((request, response, accessDeniedException) ->
+                            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden")))
             // Validate JWT before Spring's username/password auth filter.
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
@@ -119,6 +126,9 @@ public class SecurityConfig {
 
     private List<String> allowedOriginPatterns() {
         List<String> origins = new ArrayList<>(FRONTEND_DEV_ORIGINS);
+        if (appBaseUrl != null && !appBaseUrl.isBlank()) {
+            origins.add(appBaseUrl.trim());
+        }
         if (configuredAllowedOrigins != null && !configuredAllowedOrigins.isBlank()) {
             origins.addAll(Arrays.stream(configuredAllowedOrigins.split(","))
                     .map(String::trim)

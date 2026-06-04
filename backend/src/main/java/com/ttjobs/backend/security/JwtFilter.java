@@ -95,7 +95,8 @@ public class JwtFilter extends OncePerRequestFilter {
                 || path.equals("/openapi.yaml") || path.equals("/actuator/health")) {
             return true;
         }
-        if ("GET".equalsIgnoreCase(method) && path.startsWith("/api/jobs")) {
+        if ("GET".equalsIgnoreCase(method) && path.startsWith("/api/jobs")
+                && request.getHeader("Authorization") == null) {
             return true;
         }
         return false;

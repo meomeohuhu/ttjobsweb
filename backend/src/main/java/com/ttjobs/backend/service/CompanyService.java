@@ -60,8 +60,7 @@ public class CompanyService {
     private JobRepository jobRepository;
 
     public List<CompanyDTO> getAllCompanies() {
-        // Public company listing for authenticated users.
-        return companyRepository.findByDeletedAtIsNull().stream()
+        return companyRepository.findByDeletedAtIsNullAndVerificationStatus(Company.VerificationStatus.VERIFIED).stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
@@ -80,7 +79,7 @@ public class CompanyService {
                 .thenComparing(Comparator.comparingLong(CompanyDTO::getJobCount).reversed())
                 .thenComparing(company -> company.getName() == null ? "" : company.getName().toLowerCase());
 
-        return companyRepository.findByDeletedAtIsNull().stream()
+        return companyRepository.findByDeletedAtIsNullAndVerificationStatus(Company.VerificationStatus.VERIFIED).stream()
                 .map(this::convertToDTO)
                 .sorted(comparator)
                 .limit(safeLimit)
@@ -90,8 +89,13 @@ public class CompanyService {
     public List<JobDTO> getPublicCompanyJobs(Long companyId) {
         Company company = companyRepository.findByIdAndDeletedAtIsNull(companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Company not found"));
+        requirePublicCompany(company);
         Pageable pageable = PageRequest.of(0, 20);
-        return jobRepository.findCompanyJobsWithSavedCount(company.getId(), "open", pageable).stream()
+        return jobRepository.findCompanyJobsWithSavedCount(
+                        company.getId(),
+                        "open",
+                        Company.VerificationStatus.VERIFIED,
+                        pageable).stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
@@ -99,10 +103,15 @@ public class CompanyService {
     public CompanyPublicPageDTO getPublicCompanyPage(Long companyId) {
         Company company = companyRepository.findByIdAndDeletedAtIsNull(companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Company not found"));
+        requirePublicCompany(company);
         Pageable pageable = PageRequest.of(0, 20);
         CompanyPublicPageDTO dto = new CompanyPublicPageDTO();
         dto.setCompany(convertToDTO(company));
-        dto.setJobs(jobRepository.findCompanyJobsWithSavedCount(company.getId(), "open", pageable).stream()
+        dto.setJobs(jobRepository.findCompanyJobsWithSavedCount(
+                        company.getId(),
+                        "open",
+                        Company.VerificationStatus.VERIFIED,
+                        pageable).stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList()));
         return dto;
@@ -348,6 +357,12 @@ public class CompanyService {
         return authContextService.getCurrentUserOptional()
                 .map(user -> authContextService.isAdmin(user) || companyAuthorizationService.canManageCompany(user, company))
                 .orElse(false);
+    }
+
+    private void requirePublicCompany(Company company) {
+        if (!companyVerificationStatusService.isVerified(company)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Company not found");
+        }
     }
 
     private JobDTO convertToDTO(JobWithSavedCount projection) {

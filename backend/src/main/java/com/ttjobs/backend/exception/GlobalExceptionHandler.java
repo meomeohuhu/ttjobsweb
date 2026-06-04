@@ -53,7 +53,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, String>> handleRuntime(RuntimeException ex) {
         Map<String, String> body = new HashMap<>();
-        body.put("message", ex.getMessage() != null ? ex.getMessage() : "Request failed");
+        body.put("message", "Request failed");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 }

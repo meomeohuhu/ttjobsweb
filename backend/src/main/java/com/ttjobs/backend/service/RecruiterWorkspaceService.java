@@ -61,6 +61,7 @@ import java.util.stream.Collectors;
 public class RecruiterWorkspaceService {
 
     private static final Set<String> MANAGED_MEMBER_ROLES = Set.of("ADMIN", "RECRUITER");
+    private static final Set<String> VALID_CAMPAIGN_STATUSES = Set.of("active", "paused", "archived", "completed");
 
     @Autowired
     private AuthContextService authContextService;
@@ -183,7 +184,16 @@ public class RecruiterWorkspaceService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Application not found"));
 
         requireApplicationAccess(currentUser, application);
+        if (isBlank(resolveCvText(application))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Application has no CV text for AI scoring");
+        }
+        if (isBlank(buildJobText(application.getJob()))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Job has no description for AI scoring");
+        }
         ensureAiScore(application, Boolean.TRUE.equals(refresh));
+        if (applicationAiScoreRepository.findByApplicationId(application.getId()).isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "AI service did not return a CV score");
+        }
         return toApplicationDetailDto(application);
     }
 
@@ -309,6 +319,7 @@ public class RecruiterWorkspaceService {
                 .toList();
     }
 
+    @Transactional
     public RecruitmentCampaignDTO saveCampaign(Long campaignId, RecruitmentCampaignRequest request) {
         User currentUser = requireRecruiterOrAdmin();
         if (request == null || request.getCompanyId() == null || isBlank(request.getName())) {
@@ -324,17 +335,28 @@ public class RecruiterWorkspaceService {
                 ? new RecruitmentCampaign()
                 : campaignRepository.findById(campaignId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Campaign not found"));
+        if (campaign.getCompany() != null
+                && !authContextService.isAdmin(currentUser)
+                && !companyAuthorizationService.canManageCompany(currentUser, campaign.getCompany())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You cannot manage this campaign");
+        }
         campaign.setCompany(company);
         if (campaign.getCreatedBy() == null) {
             campaign.setCreatedBy(currentUser);
         }
         campaign.setName(request.getName());
         campaign.setDescription(request.getDescription());
-        campaign.setStatus(isBlank(request.getStatus()) ? "active" : request.getStatus());
+        campaign.setStatus(normalizeCampaignStatus(request.getStatus()));
         campaign.setTargetHires(request.getTargetHires());
         campaign.setStartsAt(request.getStartsAt());
         campaign.setEndsAt(request.getEndsAt());
-        campaign.setJobs(loadCampaignJobs(currentUser, request.getJobIds()));
+        List<Job> campaignJobs = loadCampaignJobs(currentUser, request.getJobIds());
+        if (campaign.getJobs() == null) {
+            campaign.setJobs(new ArrayList<>());
+        } else {
+            campaign.getJobs().clear();
+        }
+        campaign.getJobs().addAll(campaignJobs);
         return toCampaignDto(campaignRepository.save(campaign));
     }
 
@@ -411,6 +433,14 @@ public class RecruiterWorkspaceService {
                 .map(managed::get)
                 .filter(Objects::nonNull)
                 .toList();
+    }
+
+    private String normalizeCampaignStatus(String status) {
+        String value = isBlank(status) ? "active" : status.trim().toLowerCase(Locale.ROOT);
+        if (!VALID_CAMPAIGN_STATUSES.contains(value)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid campaign status");
+        }
+        return value;
     }
 
     private RecruiterCompanyDTO toCompanyDto(Company company, User currentUser, List<Job> jobs) {

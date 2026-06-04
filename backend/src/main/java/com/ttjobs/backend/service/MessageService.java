@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -35,6 +36,17 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class MessageService {
+
+    private static final long MAX_ATTACHMENT_SIZE = 10L * 1024 * 1024;
+    private static final Set<String> ALLOWED_ATTACHMENT_TYPES = Set.of(
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+            "text/plain"
+    );
 
     @Autowired
     private ConversationRepository conversationRepository;
@@ -232,6 +244,7 @@ public class MessageService {
     }
 
     private MessageAttachment uploadAttachment(Message message, MultipartFile file) {
+        validateAttachment(file);
         Cloudinary cloudinary = requireCloudinary();
         try {
             Map<?, ?> result = cloudinary.uploader().upload(file.getBytes(), ObjectUtils.asMap(
@@ -242,7 +255,7 @@ public class MessageService {
             ));
             MessageAttachment attachment = new MessageAttachment();
             attachment.setMessage(message);
-            attachment.setFileName(file.getOriginalFilename());
+            attachment.setFileName(sanitizeUploadName(file.getOriginalFilename()));
             attachment.setFileUrl(String.valueOf(result.get("secure_url")));
             attachment.setPublicId(String.valueOf(result.get("public_id")));
             attachment.setMimeType(file.getContentType());
@@ -252,6 +265,28 @@ public class MessageService {
         } catch (IOException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot upload attachment", ex);
         }
+    }
+
+    private void validateAttachment(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Attachment file is required");
+        }
+        if (file.getSize() > MAX_ATTACHMENT_SIZE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Attachment file size exceeds 10MB");
+        }
+        if (!ALLOWED_ATTACHMENT_TYPES.contains(file.getContentType())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported attachment file type");
+        }
+        sanitizeUploadName(file.getOriginalFilename());
+    }
+
+    private String sanitizeUploadName(String fileName) {
+        String safeName = (fileName == null || fileName.isBlank()) ? "attachment" : fileName.trim();
+        if (safeName.contains("\r") || safeName.contains("\n") || safeName.contains("\0")
+                || safeName.contains("/") || safeName.contains("\\")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid attachment file name");
+        }
+        return safeName;
     }
 
     private Cloudinary requireCloudinary() {

@@ -45,7 +45,8 @@ class UserAvatarServiceTest {
     void uploadMyAvatar_shouldReturnServiceUnavailable_whenCloudinaryNotConfigured() {
         User user = user(1L);
         MockMultipartFile file = new MockMultipartFile(
-                "file", "avatar.png", "image/png", "dummy".getBytes()
+                "file", "avatar.png", "image/png",
+                new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}
         );
 
         when(authContextService.requireCurrentUser()).thenReturn(user);
@@ -61,7 +62,8 @@ class UserAvatarServiceTest {
     void uploadMyAvatar_shouldSaveAvatarUrl_whenUploadSuccess() throws IOException {
         User user = user(2L);
         MockMultipartFile file = new MockMultipartFile(
-                "file", "avatar.png", "image/png", "hello".getBytes()
+                "file", "avatar.png", "image/png",
+                new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}
         );
 
         when(authContextService.requireCurrentUser()).thenReturn(user);

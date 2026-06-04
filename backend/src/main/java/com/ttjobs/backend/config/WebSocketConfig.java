@@ -56,6 +56,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     private InterviewRoomRepository interviewRoomRepository;
     @Value("${ttjobs.cors.allowed-origins:}")
     private String configuredAllowedOrigins;
+    @Value("${ttjobs.app.base-url:}")
+    private String appBaseUrl;
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
@@ -83,18 +85,17 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                     authenticate(accessor);
                 }
                 if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
-                    authorizeConversationSubscription(accessor);
-                    authorizeInterviewSubscription(accessor);
+                    authorizeSubscription(accessor);
                 }
                 return message;
             }
         });
     }
 
-    private void authenticate(StompHeaderAccessor accessor) {
+    void authenticate(StompHeaderAccessor accessor) {
         String authHeader = accessor.getFirstNativeHeader("Authorization");
         if (authHeader == null || authHeader.isBlank()) {
-            return;
+            throw new AccessDeniedException("Unauthorized websocket connection");
         }
         if (!authHeader.startsWith("Bearer ")) {
             throw new AccessDeniedException("Unauthorized websocket connection");
@@ -102,17 +103,40 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
         String token = authHeader.substring(7);
         String email = jwtService.extractEmail(token);
-        String role = jwtService.extractRole(token);
-        if (email == null || email.isBlank() || role == null || role.isBlank()) {
+        if (email == null || email.isBlank()) {
             throw new AccessDeniedException("Unauthorized websocket connection");
         }
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AccessDeniedException("Unauthorized websocket connection"));
 
-        String authority = "ROLE_" + role.toUpperCase(Locale.ROOT);
+        String authority = "ROLE_" + user.getRole().name().toUpperCase(Locale.ROOT);
         accessor.setUser(new UsernamePasswordAuthenticationToken(
-                email,
+                user.getEmail(),
                 null,
                 Collections.singletonList(new SimpleGrantedAuthority(authority))
         ));
+    }
+
+    void authorizeSubscription(StompHeaderAccessor accessor) {
+        String destination = accessor.getDestination();
+        if (destination == null || !destination.startsWith("/topic/")) {
+            return;
+        }
+
+        if (destination.startsWith("/topic/conversations/")) {
+            authorizeConversationSubscription(accessor);
+            return;
+        }
+        if (destination.startsWith("/topic/interviews/")) {
+            authorizeInterviewSubscription(accessor);
+            return;
+        }
+        if (destination.startsWith("/topic/users/")) {
+            authorizeUserSubscription(accessor);
+            return;
+        }
+
+        throw new AccessDeniedException("Forbidden websocket subscription");
     }
 
     private void authorizeConversationSubscription(StompHeaderAccessor accessor) {
@@ -156,6 +180,23 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         }
     }
 
+    private void authorizeUserSubscription(StompHeaderAccessor accessor) {
+        String destination = accessor.getDestination();
+        if (destination == null || !destination.startsWith("/topic/users/")) {
+            return;
+        }
+        if (accessor.getUser() == null || accessor.getUser().getName() == null) {
+            throw new AccessDeniedException("Unauthorized websocket subscription");
+        }
+
+        Long userId = parseUserTopicId(destination);
+        User user = userRepository.findByEmail(accessor.getUser().getName())
+                .orElseThrow(() -> new AccessDeniedException("Unauthorized websocket subscription"));
+        if (user.getRole() != User.Role.ADMIN && !user.getId().equals(userId)) {
+            throw new AccessDeniedException("Forbidden websocket subscription");
+        }
+    }
+
     private Long parseConversationId(String destination) {
         try {
             return Long.parseLong(destination.substring("/topic/conversations/".length()));
@@ -174,8 +215,26 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         return roomId;
     }
 
+    private Long parseUserTopicId(String destination) {
+        String suffix = destination.substring("/topic/users/".length());
+        int slash = suffix.indexOf('/');
+        String userId = slash >= 0 ? suffix.substring(0, slash) : suffix;
+        String remainingPath = slash >= 0 ? suffix.substring(slash + 1) : "";
+        if (!"conversations".equals(remainingPath)) {
+            throw new AccessDeniedException("Forbidden websocket subscription");
+        }
+        try {
+            return Long.parseLong(userId);
+        } catch (NumberFormatException ex) {
+            throw new AccessDeniedException("Invalid websocket subscription");
+        }
+    }
+
     private List<String> allowedOriginPatterns() {
         List<String> origins = new ArrayList<>(FRONTEND_DEV_ORIGINS);
+        if (appBaseUrl != null && !appBaseUrl.isBlank()) {
+            origins.add(appBaseUrl.trim());
+        }
         if (configuredAllowedOrigins != null && !configuredAllowedOrigins.isBlank()) {
             origins.addAll(Arrays.stream(configuredAllowedOrigins.split(","))
                     .map(String::trim)

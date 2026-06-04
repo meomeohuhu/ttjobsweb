@@ -205,10 +205,13 @@ class CompanyServiceTest {
     void getTopCompaniesBySavedJobs_shouldSortBySavedCount() {
         Company first = company(1L, null);
         first.setName("Alpha");
+        first.setVerificationStatus(Company.VerificationStatus.VERIFIED);
         Company second = company(2L, null);
         second.setName("Beta");
+        second.setVerificationStatus(Company.VerificationStatus.VERIFIED);
 
-        when(companyRepository.findByDeletedAtIsNull()).thenReturn(java.util.List.of(first, second));
+        when(companyRepository.findByDeletedAtIsNullAndVerificationStatus(Company.VerificationStatus.VERIFIED))
+                .thenReturn(java.util.List.of(first, second));
         when(jobRepository.countByCompanyIdAndStatus(1L, "open")).thenReturn(5L);
         when(jobRepository.countByCompanyIdAndStatus(2L, "open")).thenReturn(10L);
         when(jobRepository.countSavedJobsByCompanyId(1L)).thenReturn(30L);
@@ -223,9 +226,51 @@ class CompanyServiceTest {
     }
 
     @Test
+    void getAllCompanies_shouldOnlyReturnVerifiedCompanies() {
+        Company verified = company(1L, null);
+        verified.setName("Verified");
+        verified.setVerificationStatus(Company.VerificationStatus.VERIFIED);
+
+        when(companyRepository.findByDeletedAtIsNullAndVerificationStatus(Company.VerificationStatus.VERIFIED))
+                .thenReturn(java.util.List.of(verified));
+
+        var result = companyService.getAllCompanies();
+
+        assertEquals(1, result.size());
+        assertEquals("Verified", result.get(0).getName());
+    }
+
+    @Test
+    void getPublicCompanyJobs_shouldReturnNotFound_whenCompanyPending() {
+        Company company = company(9L, null);
+        company.setVerificationStatus(Company.VerificationStatus.PENDING);
+
+        when(companyRepository.findByIdAndDeletedAtIsNull(9L)).thenReturn(Optional.of(company));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> companyService.getPublicCompanyJobs(9L));
+
+        assertEquals(404, ex.getStatusCode().value());
+    }
+
+    @Test
+    void getPublicCompanyPage_shouldReturnNotFound_whenCompanyPending() {
+        Company company = company(9L, null);
+        company.setVerificationStatus(Company.VerificationStatus.PENDING);
+
+        when(companyRepository.findByIdAndDeletedAtIsNull(9L)).thenReturn(Optional.of(company));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> companyService.getPublicCompanyPage(9L));
+
+        assertEquals(404, ex.getStatusCode().value());
+    }
+
+    @Test
     void getPublicCompanyJobs_shouldReturnOpenJobs() {
         Company company = company(9L, null);
         company.setName("Acme");
+        company.setVerificationStatus(Company.VerificationStatus.VERIFIED);
 
         Job job = new Job();
         job.setId(101L);
@@ -234,7 +279,11 @@ class CompanyServiceTest {
         job.setCompany(company);
 
         when(companyRepository.findByIdAndDeletedAtIsNull(9L)).thenReturn(Optional.of(company));
-        when(jobRepository.findCompanyJobsWithSavedCount(eq(9L), eq("open"), org.mockito.ArgumentMatchers.any(Pageable.class)))
+        when(jobRepository.findCompanyJobsWithSavedCount(
+                eq(9L),
+                eq("open"),
+                eq(Company.VerificationStatus.VERIFIED),
+                org.mockito.ArgumentMatchers.any(Pageable.class)))
                 .thenReturn(java.util.List.of(new com.ttjobs.backend.repository.JobWithSavedCount() {
                     @Override
                     public Job getJob() {
@@ -260,6 +309,7 @@ class CompanyServiceTest {
         Company company = company(9L, null);
         company.setName("Acme");
         company.setLogoUrl("https://cdn.example.com/logo.png");
+        company.setVerificationStatus(Company.VerificationStatus.VERIFIED);
 
         Job job = new Job();
         job.setId(101L);
@@ -268,7 +318,11 @@ class CompanyServiceTest {
         job.setCompany(company);
 
         when(companyRepository.findByIdAndDeletedAtIsNull(9L)).thenReturn(Optional.of(company));
-        when(jobRepository.findCompanyJobsWithSavedCount(eq(9L), eq("open"), org.mockito.ArgumentMatchers.any(Pageable.class)))
+        when(jobRepository.findCompanyJobsWithSavedCount(
+                eq(9L),
+                eq("open"),
+                eq(Company.VerificationStatus.VERIFIED),
+                org.mockito.ArgumentMatchers.any(Pageable.class)))
                 .thenReturn(java.util.List.of(new com.ttjobs.backend.repository.JobWithSavedCount() {
                     @Override
                     public Job getJob() {

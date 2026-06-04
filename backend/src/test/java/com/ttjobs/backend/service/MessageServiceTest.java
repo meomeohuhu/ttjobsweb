@@ -15,6 +15,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -97,6 +98,69 @@ class MessageServiceTest {
                 contains("User 1"),
                 eq("CHAT_MESSAGE"),
                 eq("/recruiter/chat?conversationId=10"));
+    }
+
+    @Test
+    void sendMessageWithAttachment_shouldRejectUnsupportedMimeType() {
+        User current = user(1L);
+        Conversation conversation = new Conversation();
+        conversation.setId(10L);
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "payload.exe",
+                "application/x-msdownload",
+                new byte[] {1, 2, 3});
+
+        when(authContextService.requireCurrentUser()).thenReturn(current);
+        when(conversationRepository.findById(10L)).thenReturn(java.util.Optional.of(conversation));
+        when(conversationMemberRepository.existsByIdConversationIdAndIdUserId(10L, 1L)).thenReturn(true);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> messageService.sendMessageWithAttachment(10L, "", file));
+
+        assertEquals(400, ex.getStatusCode().value());
+    }
+
+    @Test
+    void sendMessageWithAttachment_shouldRejectUnsafeFileName() {
+        User current = user(1L);
+        Conversation conversation = new Conversation();
+        conversation.setId(10L);
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "..\\payload.pdf",
+                "application/pdf",
+                "%PDF".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+        when(authContextService.requireCurrentUser()).thenReturn(current);
+        when(conversationRepository.findById(10L)).thenReturn(java.util.Optional.of(conversation));
+        when(conversationMemberRepository.existsByIdConversationIdAndIdUserId(10L, 1L)).thenReturn(true);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> messageService.sendMessageWithAttachment(10L, "", file));
+
+        assertEquals(400, ex.getStatusCode().value());
+    }
+
+    @Test
+    void sendMessageWithAttachment_shouldRejectOversizedFile() {
+        User current = user(1L);
+        Conversation conversation = new Conversation();
+        conversation.setId(10L);
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "large.pdf",
+                "application/pdf",
+                new byte[(10 * 1024 * 1024) + 1]);
+
+        when(authContextService.requireCurrentUser()).thenReturn(current);
+        when(conversationRepository.findById(10L)).thenReturn(java.util.Optional.of(conversation));
+        when(conversationMemberRepository.existsByIdConversationIdAndIdUserId(10L, 1L)).thenReturn(true);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> messageService.sendMessageWithAttachment(10L, "", file));
+
+        assertEquals(400, ex.getStatusCode().value());
     }
 
     private ConversationMember member(Conversation conversation, User user) {

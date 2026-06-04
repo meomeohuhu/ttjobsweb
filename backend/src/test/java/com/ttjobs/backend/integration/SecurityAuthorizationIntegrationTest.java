@@ -17,6 +17,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -45,6 +46,19 @@ class SecurityAuthorizationIntegrationTest {
 
         mockMvc.perform(get("/api/admin/test")
                         .header("Authorization", token))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void adminStats_shouldReturnForbidden_forAuthenticatedNonAdminTokens() throws Exception {
+        User candidate = createUser(User.Role.CANDIDATE);
+        User recruiter = createUser(User.Role.RECRUITER);
+
+        mockMvc.perform(get("/api/admin/stats")
+                        .header("Authorization", bearerToken(candidate)))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/admin/stats")
+                        .header("Authorization", bearerToken(recruiter)))
                 .andExpect(status().isForbidden());
     }
 
@@ -120,6 +134,31 @@ class SecurityAuthorizationIntegrationTest {
     void savedJobs_shouldReturnUnauthorized_whenMissingToken() throws Exception {
         mockMvc.perform(get("/api/saved-jobs"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void unmatchedRoute_shouldReturnUnauthorized_whenMissingToken() throws Exception {
+        mockMvc.perform(get("/unmatched-security-check"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void publicRoutes_shouldRemainAccessibleWithoutToken() throws Exception {
+        mockMvc.perform(get("/api/jobs"))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/companies"))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/career-guides"))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/skills"))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/forum/posts"))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/tools/salary-benchmark"))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/actuator/health"))
+                .andExpect(result -> assertTrue(
+                        result.getResponse().getStatus() != 401 && result.getResponse().getStatus() != 403));
     }
 
     @Test

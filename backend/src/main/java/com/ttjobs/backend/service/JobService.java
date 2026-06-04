@@ -59,7 +59,7 @@ public class JobService {
     public List<JobDTO> getAllJobs() {
         // Default candidate-facing list only shows open jobs.
         Pageable pageable = PageRequest.of(0, 50);
-        return jobRepository.findJobsWithSavedCount(OPEN, pageable)
+        return jobRepository.findJobsWithSavedCount(OPEN, Company.VerificationStatus.VERIFIED, pageable)
                 .stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
@@ -86,7 +86,7 @@ public class JobService {
 
         int safeSize = size == null ? 12 : Math.max(1, Math.min(size, 50));
         Pageable pageable = PageRequest.of(0, safeSize);
-        return jobRepository.findHighlightedJobs(OPEN, pageable)
+        return jobRepository.findHighlightedJobs(OPEN, Company.VerificationStatus.VERIFIED, pageable)
                 .stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
@@ -100,7 +100,7 @@ public class JobService {
 
         int safeSize = size == null ? 12 : Math.max(1, Math.min(size, 50));
         Pageable pageable = PageRequest.of(0, safeSize);
-        return jobRepository.findBestJobs(OPEN, pageable)
+        return jobRepository.findBestJobs(OPEN, Company.VerificationStatus.VERIFIED, pageable)
                 .stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
@@ -109,7 +109,7 @@ public class JobService {
     public List<JobCategoryStatDTO> getTopCategories(Integer size) {
         int safeSize = size == null ? 8 : Math.max(1, Math.min(size, 24));
         Pageable pageable = PageRequest.of(0, safeSize);
-        return jobRepository.findTopCategories(OPEN, pageable)
+        return jobRepository.findTopCategories(OPEN, Company.VerificationStatus.VERIFIED, pageable)
                 .stream()
                 .map(item -> {
                     String category = normalizeCategoryCode(item.getCategory());

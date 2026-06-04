@@ -2,9 +2,11 @@ package com.ttjobs.backend.controller;
 
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 import com.ttjobs.backend.entity.Company;
 import com.ttjobs.backend.dto.company.CompanyDTO;
 import com.ttjobs.backend.dto.company.CompanyMemberDTO;
@@ -39,7 +41,7 @@ public class CompanyController {
     @GetMapping("/{id}")
     public CompanyDTO getCompanyById(@PathVariable Long id) {
         return companyService.getCompanyById(id)
-                .orElseThrow(() -> new RuntimeException("Company not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Company not found"));
     }
 
     @GetMapping("/{companyId}/jobs")
